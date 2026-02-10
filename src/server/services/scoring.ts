@@ -14,6 +14,7 @@ import {
   getCaseLeaderboard,
   getUserRank,
   getCaseLeaderboardSize,
+  getMinigameScore,
 } from './redis';
 import type { LeaderboardEntry, LeaderboardResponse } from '../../shared/types';
 
@@ -92,7 +93,11 @@ export async function computeUserScore(
   const streak = await getStreak(caseData.subId, userId);
   const streakBonus = Math.min(streak.current, 10);
 
-  const total = predictionMatch + verdictMatch + timingBonus + influenceBonus + streakBonus;
+  // 6. Mini-game bonus: 0..10 (every 50 minigame points = +1)
+  const minigameScore = await getMinigameScore(caseData.caseId, userId);
+  const miniGameBonus = Math.min(Math.floor(minigameScore / 50), 10);
+
+  const total = predictionMatch + verdictMatch + timingBonus + influenceBonus + streakBonus + miniGameBonus;
 
   const score: ScoreBreakdown = {
     caseId: caseData.caseId,
@@ -102,6 +107,7 @@ export async function computeUserScore(
     timingBonus,
     influenceBonus,
     streakBonus,
+    miniGameBonus,
     total,
   };
 

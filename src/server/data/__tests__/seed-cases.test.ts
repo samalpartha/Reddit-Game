@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { SEED_CASES, getSeedCase, getSeedCaseForDate } from '../seed-cases';
 
 describe('SEED_CASES', () => {
-  it('has exactly 14 cases', () => {
-    expect(SEED_CASES).toHaveLength(14);
+  it('has at least 30 cases', () => {
+    expect(SEED_CASES.length).toBeGreaterThanOrEqual(30);
   });
 
   it('every case has required fields', () => {
@@ -36,29 +36,44 @@ describe('getSeedCase', () => {
   it('returns cases cyclically', () => {
     expect(getSeedCase(0)).toBe(SEED_CASES[0]);
     expect(getSeedCase(13)).toBe(SEED_CASES[13]);
-    expect(getSeedCase(14)).toBe(SEED_CASES[0]); // Wraps around
-    expect(getSeedCase(15)).toBe(SEED_CASES[1]);
+    // Wraps around after all cases
+    const len = SEED_CASES.length;
+    expect(getSeedCase(len)).toBe(SEED_CASES[0]);
+    expect(getSeedCase(len + 1)).toBe(SEED_CASES[1]);
   });
 });
 
 describe('getSeedCaseForDate', () => {
-  it('returns a valid case for any date', () => {
+  it('returns a valid case for a cycle key', () => {
+    const case1 = getSeedCaseForDate('2026020912');
+    expect(case1).toBeTruthy();
+    expect(case1.title).toBeTruthy();
+    expect(case1.labels).toHaveLength(4);
+  });
+
+  it('returns a valid case for a legacy date key', () => {
     const case1 = getSeedCaseForDate('20260209');
     expect(case1).toBeTruthy();
     expect(case1.title).toBeTruthy();
     expect(case1.labels).toHaveLength(4);
   });
 
-  it('returns the same case for the same date', () => {
-    const a = getSeedCaseForDate('20260209');
-    const b = getSeedCaseForDate('20260209');
+  it('returns the same case for the same cycle key', () => {
+    const a = getSeedCaseForDate('2026020912');
+    const b = getSeedCaseForDate('2026020912');
     expect(a).toBe(b);
   });
 
+  it('returns different cases for different cycle keys on same day', () => {
+    const a = getSeedCaseForDate('2026020900');
+    const b = getSeedCaseForDate('2026020902');
+    expect(a.title).not.toBe(b.title);
+  });
+
   it('returns different cases for different dates', () => {
-    const a = getSeedCaseForDate('20260209');
-    const b = getSeedCaseForDate('20260210');
-    // They could theoretically be the same after 14 days, but consecutive days should differ
+    const a = getSeedCaseForDate('2026020912');
+    const b = getSeedCaseForDate('2026021012');
+    // Consecutive days at same hour should differ
     expect(a.title).not.toBe(b.title);
   });
 });

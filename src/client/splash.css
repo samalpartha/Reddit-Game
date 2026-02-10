@@ -217,6 +217,69 @@ body {
   box-shadow: 0 4px 24px rgba(156, 39, 176, 0.3);
 }
 
+/* ─── Hidden Utility ─────────────────────────────── */
+
+.hidden { display: none !important; }
+
+/* ─── Mini-Game Button ───────────────────────────── */
+
+.splash-minigame-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 340px;
+  padding: 14px 18px;
+  border: 2px solid rgba(240, 192, 64, 0.2);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(240, 192, 64, 0.08) 0%, rgba(255, 152, 0, 0.05) 100%);
+  color: #f0c040;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: fadeIn 0.6s ease-out 0.35s backwards;
+  text-align: left;
+}
+
+.splash-minigame-btn:hover {
+  background: linear-gradient(135deg, rgba(240, 192, 64, 0.15) 0%, rgba(255, 152, 0, 0.1) 100%);
+  border-color: rgba(240, 192, 64, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(240, 192, 64, 0.15);
+}
+
+.splash-minigame-btn:active {
+  transform: scale(0.97);
+}
+
+.splash-mg-icon {
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.splash-mg-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.splash-mg-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #f0c040;
+}
+
+.splash-mg-hint {
+  font-size: 11px;
+  font-weight: 500;
+  color: #8a8f98;
+}
+
+.splash-minigame-btn svg {
+  flex-shrink: 0;
+  color: #8a8f98;
+}
+
 /* ─── Stats Row ──────────────────────────────────── */
 
 .splash-stats {

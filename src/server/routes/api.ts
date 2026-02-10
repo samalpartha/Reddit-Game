@@ -11,7 +11,7 @@ import type {
   Vote,
   LeaderboardResponse,
 } from '../../shared/types';
-import { DEFAULT_LABELS, CASE_OPEN_HOURS, REVEAL_DELAY_HOURS } from '../../shared/types';
+import { DEFAULT_LABELS, CASE_OPEN_HOURS, REVEAL_DELAY_HOURS, CYCLE_HOURS } from '../../shared/types';
 import {
   getCaseByDate,
   getCase,
@@ -24,6 +24,7 @@ import {
   saveCase,
   getTodayDateKey,
   formatDateKey,
+  formatCycleKey,
   getWeekKey,
   dateKeyToDate,
   getRecentCaseDates,
@@ -38,6 +39,8 @@ import {
   addToWeeklyLeaderboard,
   markCommentTime,
   updateCaseStatus,
+  setMinigameScore,
+  getMinigameScore,
 } from '../services/redis';
 import {
   computeUserScore,
@@ -387,6 +390,7 @@ api.get('/reveal', async (c) => {
       timingBonus: 0,
       influenceBonus: 0,
       streakBonus: 0,
+      miniGameBonus: 0,
       total: 0,
     },
     streak,
@@ -401,9 +405,10 @@ api.get('/reveal', async (c) => {
 api.get('/archive', async (c) => {
   const auth = await ensureAuth();
   const subId = getSubId();
-  const days = Math.min(parseInt(c.req.query('days') ?? '7', 10), 30);
+  // 'days' param now means number of recent rounds to return
+  const rounds = Math.min(parseInt(c.req.query('days') ?? '24', 10), 100);
 
-  const dateKeys = await getRecentCaseDates(subId, days);
+  const dateKeys = await getRecentCaseDates(subId, rounds);
   const entries: ArchiveEntry[] = [];
 
   for (const dateKey of dateKeys) {
@@ -642,6 +647,35 @@ api.get('/leaderboard/weekly', async (c) => {
   }
 
   return c.json({ top, me });
+});
+
+// ─── POST /api/minigame-score ────────────────────────────────────────────────
+// Stores best minigame score for the current case.
+
+api.post('/minigame-score', async (c) => {
+  const auth = await ensureAuth();
+  if (!auth) {
+    return c.json({ error: 'Login required' }, 401);
+  }
+
+  let body: { caseId: string; score: number };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400);
+  }
+
+  if (!body.caseId || typeof body.score !== 'number' || body.score < 0) {
+    return c.json({ error: 'caseId and valid score are required' }, 400);
+  }
+
+  // Cap score at a reasonable max to prevent cheating
+  const cappedScore = Math.min(Math.round(body.score), 9999);
+
+  await setMinigameScore(body.caseId, auth.userId, cappedScore);
+  const best = await getMinigameScore(body.caseId, auth.userId);
+
+  return c.json({ success: true, bestScore: best });
 });
 
 // ─── POST /api/mod/delete-case ───────────────────────────────────────────────

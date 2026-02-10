@@ -13,6 +13,7 @@ const playText = document.getElementById('play-text') as HTMLSpanElement;
 const voterCount = document.getElementById('voter-count') as HTMLSpanElement;
 const timeLeft = document.getElementById('time-left') as HTMLSpanElement;
 const timeLabel = document.getElementById('time-label') as HTMLSpanElement;
+const minigameButton = document.getElementById('minigame-button') as HTMLButtonElement;
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -57,18 +58,21 @@ function renderSplash() {
     playText.textContent = 'See Results';
     timeLeft.textContent = 'Done';
     timeLabel.textContent = 'Revealed';
+    minigameButton.classList.add('hidden');
   } else if (userVote) {
     statusDot.className = 'status-dot voted';
     statusText.textContent = 'You voted! Waiting for reveal...';
     playButton.className = 'splash-play-btn voted';
     playText.textContent = 'Check Status';
     startCountdown(caseData.revealTs, 'Reveal');
+    minigameButton.classList.remove('hidden');
   } else if (caseData.status === 'closed') {
     statusDot.className = 'status-dot closed';
     statusText.textContent = 'Voting closed. Reveal coming soon.';
     playButton.className = 'splash-play-btn voted';
     playText.textContent = 'View Case';
     startCountdown(caseData.revealTs, 'Reveal');
+    minigameButton.classList.add('hidden');
   } else {
     // Open for voting
     statusDot.className = 'status-dot';
@@ -76,6 +80,7 @@ function renderSplash() {
     playButton.className = 'splash-play-btn';
     playText.textContent = 'Vote Now';
     startCountdown(caseData.closeTs, 'Remaining');
+    minigameButton.classList.remove('hidden');
   }
 }
 
@@ -111,6 +116,10 @@ function startCountdown(targetTs: number, label: string) {
 // ─── Play Button Handler ─────────────────────────────────────────────────────
 
 playButton.addEventListener('click', (e) => {
+  requestExpandedMode(e, 'game');
+});
+
+minigameButton.addEventListener('click', (e) => {
   requestExpandedMode(e, 'game');
 });
 

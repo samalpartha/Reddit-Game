@@ -11,16 +11,17 @@ import {
   getTodayDateKey,
   getApprovedSubmissionForDate,
   saveCase,
+  formatCycleKey,
 } from '../services/redis';
 import { computeUserScore, computeMajority } from '../services/scoring';
-import { CASE_OPEN_HOURS, REVEAL_DELAY_HOURS, DEFAULT_LABELS, REVEAL_SCAN_DAYS } from '../../shared/types';
+import { CASE_OPEN_HOURS, REVEAL_DELAY_HOURS, CYCLE_HOURS, DEFAULT_LABELS, REVEAL_SCAN_DAYS } from '../../shared/types';
 import { getSeedCaseForDate } from '../data/seed-cases';
 import type { Case } from '../../shared/types';
 
 export const scheduler = new Hono();
 
 // ─── POST /internal/scheduler/daily-post ─────────────────────────────────────
-// Creates today's case and post. Runs daily at noon UTC.
+// Creates the current round's case and post. Runs every 2 hours.
 
 scheduler.post('/daily-post', async (c) => {
   try {
@@ -151,15 +152,13 @@ scheduler.post('/reveal', async (c) => {
     const now = Date.now();
     let revealedCount = 0;
 
-    // Check recent days of cases for potential reveals
-    for (let daysAgo = 0; daysAgo < REVEAL_SCAN_DAYS; daysAgo++) {
-      const d = new Date(now - daysAgo * 86400000);
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      const dateKey = `${y}${m}${day}`;
+    // Check recent cycles for potential reveals (scan last 36 cycles = 3 days worth)
+    const cyclesToScan = REVEAL_SCAN_DAYS * Math.ceil(24 / CYCLE_HOURS);
+    for (let cyclesAgo = 0; cyclesAgo < cyclesToScan; cyclesAgo++) {
+      const d = new Date(now - cyclesAgo * CYCLE_HOURS * 3600000);
+      const cycleKey = formatCycleKey(d);
 
-      const caseData = await getCaseByDate(subId, dateKey);
+      const caseData = await getCaseByDate(subId, cycleKey);
       if (!caseData) continue;
 
       if (caseData.status === 'closed' && now >= caseData.revealTs) {

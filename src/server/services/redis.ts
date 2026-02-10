@@ -269,13 +269,13 @@ export async function updateStreak(
   const streak = await getStreak(subId, userId);
 
   if (streak.lastPlayedDate === dateKey) {
-    return streak; // Already counted today
+    return streak; // Already counted this cycle
   }
 
-  const yesterday = getPreviousDateKey(dateKey);
+  const previousCycle = getPreviousCycleKey(dateKey);
 
-  if (streak.lastPlayedDate === yesterday) {
-    // Consecutive day
+  if (streak.lastPlayedDate === previousCycle) {
+    // Consecutive cycle
     streak.current++;
   } else {
     // Streak broken, restart
@@ -409,12 +409,25 @@ export async function getRecentCaseDates(subId: string, days: number): Promise<s
 }
 
 // ─── Date Utilities ──────────────────────────────────────────────────────────
+// Cycle keys use YYYYMMDDHH format where HH is the 2-hour slot (00, 02, ..., 22).
+
+import { CYCLE_HOURS } from '../../shared/types';
 
 export function getTodayDateKey(): string {
   const now = new Date();
-  return formatDateKey(now);
+  return formatCycleKey(now);
 }
 
+export function formatCycleKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const slot = Math.floor(d.getUTCHours() / CYCLE_HOURS) * CYCLE_HOURS;
+  const hh = String(slot).padStart(2, '0');
+  return `${y}${m}${day}${hh}`;
+}
+
+/** Legacy format for backward compatibility */
 export function formatDateKey(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -430,18 +443,38 @@ export function getWeekKey(d: Date): string {
   return `${y}-W${String(week).padStart(2, '0')}`;
 }
 
-function getPreviousDateKey(dateKey: string): string {
-  const y = parseInt(dateKey.slice(0, 4), 10);
-  const m = parseInt(dateKey.slice(4, 6), 10) - 1;
-  const d = parseInt(dateKey.slice(6, 8), 10);
-  const date = new Date(y, m, d);
-  date.setDate(date.getDate() - 1);
-  return formatDateKey(date);
+function getPreviousCycleKey(cycleKey: string): string {
+  // Parse YYYYMMDDHH, go back one cycle
+  const y = parseInt(cycleKey.slice(0, 4), 10);
+  const m = parseInt(cycleKey.slice(4, 6), 10) - 1;
+  const d = parseInt(cycleKey.slice(6, 8), 10);
+  const h = parseInt(cycleKey.slice(8, 10), 10);
+  const date = new Date(y, m, d, h);
+  date.setHours(date.getHours() - CYCLE_HOURS);
+  return formatCycleKey(date);
 }
 
 export function dateKeyToDate(dateKey: string): Date {
   const y = parseInt(dateKey.slice(0, 4), 10);
   const m = parseInt(dateKey.slice(4, 6), 10) - 1;
   const d = parseInt(dateKey.slice(6, 8), 10);
-  return new Date(y, m, d);
+  const h = dateKey.length >= 10 ? parseInt(dateKey.slice(8, 10), 10) : 0;
+  return new Date(y, m, d, h);
+}
+
+// ─── Minigame Score Operations ──────────────────────────────────────────────
+
+export async function setMinigameScore(caseId: string, userId: string, score: number): Promise<void> {
+  const key = `minigame:${caseId}:${userId}`;
+  const existing = await redis.get(key);
+  const prev = existing ? parseInt(existing, 10) : 0;
+  if (score > prev) {
+    await redis.set(key, String(score));
+  }
+}
+
+export async function getMinigameScore(caseId: string, userId: string): Promise<number> {
+  const key = `minigame:${caseId}:${userId}`;
+  const raw = await redis.get(key);
+  return raw ? parseInt(raw, 10) : 0;
 }

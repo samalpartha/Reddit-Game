@@ -10,45 +10,22 @@
   <body>
     <!-- Loading overlay for GameMaker -->
     <div class="loading" id="loading">
-      <div class="spinner" id="spinner"></div>
+      <div class="reveal-loading-icon">
+        <div class="gavel-anim">
+          <div class="gavel-head"></div>
+          <div class="gavel-handle"></div>
+        </div>
+      </div>
       <div class="status" id="status">Loading Reveal...</div>
       <progress value="0" max="100" id="progress" hidden></progress>
     </div>
 
-    <!-- GameMaker Canvas -->
+    <!-- GameMaker Canvas (hidden unless GM loads) -->
     <canvas class="game-canvas" id="canvas" tabindex="-1"></canvas>
 
-    <!-- Fallback Reveal (shown if GameMaker fails to load) -->
-    <div class="fallback-reveal hidden" id="fallback-reveal">
-      <div class="fb-container">
-        <div class="fb-header">
-          <span class="fb-icon">⚖️</span>
-          <h1 class="fb-title">The Verdict Is In</h1>
-        </div>
-
-        <div class="fb-stamp" id="fb-stamp">
-          <div class="fb-stamp-ring">
-            <div class="fb-stamp-text" id="fb-stamp-text">LOADING</div>
-          </div>
-        </div>
-
-        <div class="fb-chart" id="fb-chart">
-          <!-- Populated by JS -->
-        </div>
-
-        <div class="fb-score-section">
-          <div class="fb-score-label">Your Score</div>
-          <div class="fb-score-value" id="fb-score-value">0</div>
-          <div class="fb-score-detail" id="fb-score-detail"></div>
-        </div>
-
-        <div class="fb-streak" id="fb-streak">
-          <span class="fb-streak-fire">🔥</span>
-          <span class="fb-streak-text" id="fb-streak-text">0 day streak</span>
-        </div>
-
-        <button class="fb-done-btn" id="fb-done-btn">Done</button>
-      </div>
+    <!-- Canvas Reveal Experience -->
+    <div class="canvas-reveal-container hidden" id="canvas-reveal-container">
+      <canvas id="reveal-canvas" class="reveal-canvas"></canvas>
     </div>
   </body>
 </html>

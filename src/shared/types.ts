@@ -57,6 +57,7 @@ export interface ScoreBreakdown {
   timingBonus: number; // 0..20
   influenceBonus: number; // 0 or 15
   streakBonus: number; // 0..10
+  miniGameBonus: number; // 0..10
   total: number;
 }
 
@@ -202,8 +203,9 @@ export const DEFAULT_LABELS: [string, string, string, string] = [
   "Everyone's Wrong",
 ];
 
-export const CASE_OPEN_HOURS = 18; // 18 hours open for voting
-export const REVEAL_DELAY_HOURS = 6; // 6 hours after close for reveal
+export const CASE_OPEN_HOURS = 1.5; // 1.5 hours open for voting
+export const REVEAL_DELAY_HOURS = 0.5; // 0.5 hours after close for reveal (2h total cycle)
+export const CYCLE_HOURS = 2; // Total cycle length in hours
 export const MAX_SUBMISSION_LENGTH = 600;
 export const MAX_SUBMISSIONS_PER_DAY = 3;
 export const INFLUENCE_THRESHOLD_PCT = 3; // 3 percentage point increase

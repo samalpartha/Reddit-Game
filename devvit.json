@@ -47,7 +47,7 @@
   "scheduler": {
     "tasks": {
       "daily-post": {
-        "cron": "0 12 * * *",
+        "cron": "0 */2 * * *",
         "endpoint": "/internal/scheduler/daily-post"
       },
       "snapshots": {

@@ -11,10 +11,10 @@ import type {
 // ═══════════════════════════════════════════════════════════════════════════════
 // Daily Verdict – Game Client
 // State machine: loading → open → voted → revealed
-//                                  ↕ archive, submit, mod-queue
+//                                  ↕ archive, archive-detail, submit, mod-queue
 // ═══════════════════════════════════════════════════════════════════════════════
 
-type GameView = 'loading' | 'open' | 'voted' | 'closed' | 'revealed' | 'archive' | 'submit' | 'mod' | 'error';
+type GameView = 'loading' | 'open' | 'voted' | 'closed' | 'revealed' | 'archive' | 'archive-detail' | 'submit' | 'mod' | 'minigame' | 'error';
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -30,7 +30,7 @@ let hasSeenOnboarding = false;
 
 // ─── View Management ─────────────────────────────────────────────────────────
 
-const views: GameView[] = ['loading', 'open', 'voted', 'closed', 'revealed', 'archive', 'submit', 'mod', 'error'];
+const views: GameView[] = ['loading', 'open', 'voted', 'closed', 'revealed', 'archive', 'archive-detail', 'submit', 'mod', 'minigame', 'error'];
 
 function showView(view: GameView) {
   previousView = currentView;
@@ -65,6 +65,74 @@ function showToast(message: string, type: 'success' | 'error' | '' = '') {
   }, 3000);
 }
 
+// ─── Custom Modal (replaces browser prompt) ──────────────────────────────────
+
+function showModal(options: {
+  title: string;
+  message: string;
+  inputPlaceholder?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+}): Promise<string | null> {
+  return new Promise((resolve) => {
+    const overlay = document.getElementById('modal-overlay')!;
+    const titleEl = document.getElementById('modal-title')!;
+    const messageEl = document.getElementById('modal-message')!;
+    const inputEl = document.getElementById('modal-input') as HTMLInputElement;
+    const confirmBtn = document.getElementById('modal-confirm')!;
+    const cancelBtn = document.getElementById('modal-cancel')!;
+
+    titleEl.textContent = options.title;
+    messageEl.textContent = options.message;
+    confirmBtn.textContent = options.confirmLabel ?? 'Confirm';
+    cancelBtn.textContent = options.cancelLabel ?? 'Cancel';
+
+    if (options.inputPlaceholder) {
+      inputEl.classList.remove('hidden');
+      inputEl.placeholder = options.inputPlaceholder;
+      inputEl.value = '';
+    } else {
+      inputEl.classList.add('hidden');
+    }
+
+    overlay.classList.remove('hidden');
+    requestAnimationFrame(() => overlay.classList.add('visible'));
+
+    if (options.inputPlaceholder) {
+      setTimeout(() => inputEl.focus(), 100);
+    }
+
+    function cleanup() {
+      overlay.classList.remove('visible');
+      setTimeout(() => overlay.classList.add('hidden'), 300);
+      confirmBtn.removeEventListener('click', onConfirm);
+      cancelBtn.removeEventListener('click', onCancel);
+      overlay.removeEventListener('click', onOverlayClick);
+    }
+
+    function onConfirm() {
+      cleanup();
+      resolve(options.inputPlaceholder ? inputEl.value : 'confirmed');
+    }
+
+    function onCancel() {
+      cleanup();
+      resolve(null);
+    }
+
+    function onOverlayClick(e: Event) {
+      if (e.target === overlay) {
+        cleanup();
+        resolve(null);
+      }
+    }
+
+    confirmBtn.addEventListener('click', onConfirm);
+    cancelBtn.addEventListener('click', onCancel);
+    overlay.addEventListener('click', onOverlayClick);
+  });
+}
+
 // ─── API Helpers ─────────────────────────────────────────────────────────────
 
 async function apiGet<T>(path: string): Promise<T> {
@@ -95,10 +163,17 @@ function formatDate(dateKey: string): string {
   const y = parseInt(dateKey.slice(0, 4), 10);
   const m = parseInt(dateKey.slice(4, 6), 10) - 1;
   const d = parseInt(dateKey.slice(6, 8), 10);
+  const h = dateKey.length >= 10 ? parseInt(dateKey.slice(8, 10), 10) : -1;
   const date = new Date(y, m, d);
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  return `${days[date.getDay()]} ${months[date.getMonth()]} ${date.getDate()}`;
+  let str = `${days[date.getDay()]} ${months[date.getMonth()]} ${date.getDate()}`;
+  if (h >= 0) {
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    str += ` ${h12}${ampm}`;
+  }
+  return str;
 }
 
 function formatCountdown(targetTs: number): string {
@@ -114,14 +189,22 @@ function formatCountdown(targetTs: number): string {
   return `${seconds}s`;
 }
 
+// ─── Countdown Urgency Colors ────────────────────────────────────────────────
+
+function getCountdownUrgency(targetTs: number): string {
+  const diff = targetTs - Date.now();
+  const minutes = diff / 60000;
+  if (minutes > 30) return 'urgency-calm'; // green
+  if (minutes > 10) return 'urgency-warning'; // yellow
+  return 'urgency-critical'; // red
+}
+
 // ─── Initialize ──────────────────────────────────────────────────────────────
 
 async function init() {
   try {
-    // Fetch init data to check mod status
     const initData = await apiGet<{ type: string; postId: string; username: string; userId: string; isMod: boolean }>('/api/init');
 
-    // Show mod queue button if user is a mod
     if (initData.isMod) {
       document.querySelectorAll('.mod-only').forEach((el) => el.classList.remove('hidden'));
     }
@@ -152,12 +235,10 @@ function determineInitialView() {
   } else if (caseData.status === 'open') {
     renderOpenView();
     showView('open');
-    // Show onboarding tooltip for first-time users
     if (!hasSeenOnboarding) {
       showOnboarding();
     }
   } else {
-    // Closed but user hasn't voted - show a "closed" message
     renderClosedView();
     showView('closed');
   }
@@ -192,8 +273,6 @@ function showOnboarding() {
     </div>
   `;
   document.body.appendChild(overlay);
-
-  // Animate in
   requestAnimationFrame(() => overlay.classList.add('visible'));
 
   const dismiss = document.getElementById('onboarding-dismiss');
@@ -202,7 +281,6 @@ function showOnboarding() {
     setTimeout(() => overlay.remove(), 300);
   });
 
-  // Auto-dismiss on tap outside
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) {
       overlay.classList.remove('visible');
@@ -219,7 +297,6 @@ function renderClosedView() {
 
   const el = document.getElementById('closed-title');
   const textEl = document.getElementById('closed-text');
-  const countdownEl = document.getElementById('closed-countdown');
 
   if (el) el.textContent = caseData.title;
   if (textEl) textEl.textContent = caseData.text;
@@ -233,13 +310,11 @@ function renderOpenView() {
   if (!todayData) return;
   const { case: caseData } = todayData;
 
-  // Date and countdown
   const dateEl = document.getElementById('open-date');
   const countdownEl = document.getElementById('open-countdown');
   if (dateEl) dateEl.textContent = formatDate(caseData.dateKey);
   if (countdownEl) countdownEl.textContent = formatCountdown(caseData.closeTs);
 
-  // Case content
   const titleEl = document.getElementById('open-title');
   const textEl = document.getElementById('open-text');
   const sourceEl = document.getElementById('open-source');
@@ -254,9 +329,18 @@ function renderOpenView() {
     }
   }
 
-  // Voter count
+  // Zero-voter empty state
   const voterEl = document.getElementById('open-voters');
-  if (voterEl) voterEl.textContent = `${todayData.aggregate?.voters ?? 0} votes so far`;
+  const voterCount = todayData.aggregate?.voters ?? 0;
+  if (voterEl) {
+    if (voterCount === 0) {
+      voterEl.textContent = 'Be the first to vote!';
+      voterEl.classList.add('first-voter');
+    } else {
+      voterEl.textContent = `${voterCount} vote${voterCount !== 1 ? 's' : ''} so far`;
+      voterEl.classList.remove('first-voter');
+    }
+  }
 
   // Verdict buttons
   const verdictGrid = document.getElementById('verdict-grid');
@@ -286,10 +370,8 @@ function renderOpenView() {
     });
   }
 
-  // Start countdown timer
   startCountdown(caseData.closeTs, 'open-countdown');
 
-  // Reset selections
   selectedVerdict = -1;
   selectedPrediction = -1;
   updateSubmitButton();
@@ -298,7 +380,12 @@ function renderOpenView() {
 function selectVerdict(index: number) {
   selectedVerdict = index;
   document.querySelectorAll('.verdict-btn').forEach((btn) => {
-    btn.classList.toggle('selected', btn.getAttribute('data-index') === String(index));
+    const isSelected = btn.getAttribute('data-index') === String(index);
+    btn.classList.toggle('selected', isSelected);
+    if (isSelected) {
+      btn.classList.add('just-selected');
+      setTimeout(() => btn.classList.remove('just-selected'), 400);
+    }
   });
   updateSubmitButton();
 }
@@ -306,7 +393,12 @@ function selectVerdict(index: number) {
 function selectPrediction(index: number) {
   selectedPrediction = index;
   document.querySelectorAll('.prediction-btn').forEach((btn) => {
-    btn.classList.toggle('selected', btn.getAttribute('data-index') === String(index));
+    const isSelected = btn.getAttribute('data-index') === String(index);
+    btn.classList.toggle('selected', isSelected);
+    if (isSelected) {
+      btn.classList.add('just-selected');
+      setTimeout(() => btn.classList.remove('just-selected'), 400);
+    }
   });
   updateSubmitButton();
 }
@@ -341,13 +433,16 @@ async function submitVote() {
     });
 
     todayData.userVote = response.vote;
+
+    // Vote confirmation animation
+    showVoteConfirmation();
+
     renderVotedView();
     showView('voted');
     showToast('Vote submitted!', 'success');
   } catch (err) {
     console.error('Vote failed:', err);
     showToast(err instanceof Error ? err.message : 'Failed to submit vote', 'error');
-    // Reset button to its proper state based on selections
     if (btn) {
       btn.disabled = false;
       btn.className = 'submit-btn ready';
@@ -356,22 +451,41 @@ async function submitVote() {
   }
 }
 
+// ─── Vote Confirmation Micro-Animation ───────────────────────────────────────
+
+function showVoteConfirmation() {
+  const overlay = document.createElement('div');
+  overlay.className = 'vote-confirm-overlay';
+  overlay.innerHTML = `
+    <div class="vote-confirm-circle">
+      <svg class="vote-confirm-check" viewBox="0 0 52 52" fill="none">
+        <circle cx="26" cy="26" r="24" stroke="#4caf50" stroke-width="3"/>
+        <path class="vote-confirm-path" d="M14 27l8 8 16-16" stroke="#4caf50" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('visible'));
+
+  setTimeout(() => {
+    overlay.classList.remove('visible');
+    setTimeout(() => overlay.remove(), 300);
+  }, 800);
+}
+
 // ─── Voted View (Waiting) ───────────────────────────────────────────────────
 
 function renderVotedView() {
   if (!todayData?.userVote || !todayData.case) return;
   const { case: caseData, userVote } = todayData;
 
-  // Show picks
   const verdictEl = document.getElementById('voted-verdict');
   const predEl = document.getElementById('voted-prediction');
   if (verdictEl) verdictEl.textContent = caseData.labels[userVote.verdictIndex] ?? '';
   if (predEl) predEl.textContent = caseData.labels[userVote.predictionIndex] ?? '';
 
-  // Countdown to reveal
   startCountdown(caseData.revealTs, 'voted-countdown');
 
-  // Comment button state
   const commentBtn = document.getElementById('btn-commented') as HTMLButtonElement;
   if (commentBtn) {
     if (userVote.firstCommentTs) {
@@ -393,7 +507,6 @@ async function loadRevealData(caseId: string) {
     showView('revealed');
   } catch (err) {
     console.error('Reveal load failed:', err);
-    // If user hasn't voted, show a limited reveal
     if (todayData) {
       showToast('You didn\'t vote on this case', '');
       renderOpenView();
@@ -408,6 +521,21 @@ function renderRevealView() {
   if (!revealData) return;
 
   const { case: caseData, aggregate, majorityIndex, majorityLabel, percentages, score, streak, leaderboard } = revealData;
+
+  // Zero voters edge case
+  if (aggregate.voters === 0) {
+    const stampEl = document.getElementById('verdict-stamp');
+    if (stampEl) {
+      stampEl.innerHTML = `
+        <div class="empty-reveal">
+          <div class="empty-reveal-icon">🗳️</div>
+          <h3 class="empty-reveal-title">No Votes Yet</h3>
+          <p class="empty-reveal-text">Nobody voted on this case. Check back for the next one!</p>
+        </div>
+      `;
+    }
+    return;
+  }
 
   // Verdict Stamp
   const stampEl = document.getElementById('verdict-stamp');
@@ -442,7 +570,6 @@ function renderRevealView() {
 
       chartEl.appendChild(row);
 
-      // Animate bars
       requestAnimationFrame(() => {
         setTimeout(() => {
           const fill = row.querySelector('.result-bar-fill') as HTMLDivElement;
@@ -470,7 +597,6 @@ function renderScoreBreakdown(score: ScoreBreakdown) {
   const breakdownEl = document.getElementById('score-breakdown');
 
   if (totalEl) {
-    // Animate count up
     animateCountUp(totalEl, score.total, 1000);
   }
 
@@ -483,6 +609,7 @@ function renderScoreBreakdown(score: ScoreBreakdown) {
       { label: 'Timing Bonus', value: score.timingBonus, max: 20 },
       { label: 'Influence Bonus', value: score.influenceBonus, max: 15 },
       { label: 'Streak Bonus', value: score.streakBonus, max: 10 },
+      { label: 'Mini-Game Bonus', value: score.miniGameBonus ?? 0, max: 10 },
     ];
 
     for (const row of rows) {
@@ -505,6 +632,12 @@ function renderLeaderboard(lb: { top: Array<{ rank: number; username: string; sc
 
   if (listEl) {
     listEl.innerHTML = '';
+
+    if (lb.top.length === 0) {
+      listEl.innerHTML = '<p class="lb-empty">No leaderboard data yet.</p>';
+      return;
+    }
+
     for (const entry of lb.top) {
       const row = document.createElement('div');
       row.className = `lb-row ${entry.rank <= 3 ? 'top-3' : ''} ${entry.userId === todayData?.userId ? 'is-me' : ''}`;
@@ -530,7 +663,177 @@ function renderLeaderboard(lb: { top: Array<{ rank: number; username: string; sc
   }
 }
 
+// ─── Share Your Score ────────────────────────────────────────────────────────
+
+function generateShareCard(): HTMLCanvasElement | null {
+  if (!revealData) return null;
+
+  const canvas = document.getElementById('share-canvas') as HTMLCanvasElement;
+  if (!canvas) return null;
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  const W = 600;
+  const H = 400;
+  canvas.width = W;
+  canvas.height = H;
+
+  // Background
+  const bg = ctx.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, '#0a0a18');
+  bg.addColorStop(1, '#141428');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // Top accent line
+  const accent = ctx.createLinearGradient(0, 0, W, 0);
+  accent.addColorStop(0, 'transparent');
+  accent.addColorStop(0.3, '#ff4500');
+  accent.addColorStop(0.7, '#f0c040');
+  accent.addColorStop(1, 'transparent');
+  ctx.fillStyle = accent;
+  ctx.fillRect(0, 0, W, 3);
+
+  // Title
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '800 28px -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('Daily Verdict', W / 2, 45);
+
+  // Stamp
+  const stampColor = ['#4caf50', '#f44336', '#ff9800', '#2196f3'][revealData.majorityIndex] ?? '#f44336';
+  ctx.strokeStyle = stampColor;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(W / 2, 115, 45, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.fillStyle = stampColor;
+  ctx.font = '900 14px -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(revealData.majorityLabel.toUpperCase(), W / 2, 115);
+
+  // Score
+  ctx.fillStyle = '#f0c040';
+  ctx.font = '900 64px -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText(String(revealData.score.total), W / 2, 230);
+
+  ctx.fillStyle = '#6b7280';
+  ctx.font = '700 12px -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.fillText('POINTS', W / 2, 248);
+
+  // Breakdown
+  const parts: string[] = [];
+  if (revealData.score.predictionMatch > 0) parts.push(`Prediction +${revealData.score.predictionMatch}`);
+  if (revealData.score.verdictMatch > 0) parts.push(`Verdict +${revealData.score.verdictMatch}`);
+  if (revealData.score.timingBonus > 0) parts.push(`Timing +${revealData.score.timingBonus}`);
+  if (revealData.score.influenceBonus > 0) parts.push(`Influence +${revealData.score.influenceBonus}`);
+  if (revealData.score.streakBonus > 0) parts.push(`Streak +${revealData.score.streakBonus}`);
+  if ((revealData.score as ScoreBreakdown & { miniGameBonus?: number }).miniGameBonus) parts.push(`Mini-Game +${(revealData.score as ScoreBreakdown & { miniGameBonus?: number }).miniGameBonus}`);
+
+  ctx.fillStyle = '#8a8f98';
+  ctx.font = '500 13px -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.fillText(parts.join(' · ') || 'No points earned', W / 2, 275);
+
+  // Streak
+  if (revealData.streak.current > 0) {
+    ctx.fillStyle = '#ff9800';
+    ctx.font = '700 18px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillText(`🔥 ${revealData.streak.current} round streak`, W / 2, 310);
+  }
+
+  // Distribution bars (compact)
+  const barY = 330;
+  const barH = 18;
+  const barW = 400;
+  const barX = (W - barW) / 2;
+  const maxPct = Math.max(...revealData.percentages, 1);
+  const barColors = ['#4caf50', '#f44336', '#ff9800', '#2196f3'];
+
+  revealData.case.labels.forEach((label, i) => {
+    const y = barY + i * (barH + 2);
+    const fillW = (revealData!.percentages[i]! / maxPct) * barW * 0.7;
+
+    ctx.fillStyle = 'rgba(255,255,255,0.04)';
+    ctx.fillRect(barX, y, barW, barH);
+
+    ctx.fillStyle = barColors[i]!;
+    ctx.fillRect(barX, y, Math.max(fillW, 2), barH);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '600 10px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(`${label} ${revealData!.percentages[i]}%`, barX + fillW + 6, y + barH / 2 + 4);
+  });
+
+  ctx.textAlign = 'center';
+
+  return canvas;
+}
+
+async function shareScore() {
+  if (!revealData) return;
+
+  const canvas = generateShareCard();
+
+  // Build text score
+  const lines = [
+    `⚖️ Daily Verdict Score: ${revealData.score.total} points`,
+    `Verdict: ${revealData.majorityLabel}`,
+  ];
+
+  const parts: string[] = [];
+  if (revealData.score.predictionMatch > 0) parts.push(`Prediction +${revealData.score.predictionMatch}`);
+  if (revealData.score.verdictMatch > 0) parts.push(`Verdict +${revealData.score.verdictMatch}`);
+  if (revealData.score.timingBonus > 0) parts.push(`Timing +${revealData.score.timingBonus}`);
+  if (revealData.score.influenceBonus > 0) parts.push(`Influence +${revealData.score.influenceBonus}`);
+  if (revealData.score.streakBonus > 0) parts.push(`Streak +${revealData.score.streakBonus}`);
+  if ((revealData.score as ScoreBreakdown & { miniGameBonus?: number }).miniGameBonus) parts.push(`Mini-Game +${(revealData.score as ScoreBreakdown & { miniGameBonus?: number }).miniGameBonus}`);
+
+  if (parts.length > 0) lines.push(parts.join(' · '));
+  if (revealData.streak.current > 0) lines.push(`🔥 ${revealData.streak.current} round streak`);
+
+  const text = lines.join('\n');
+
+  try {
+    // Try native share first
+    if (navigator.share && canvas) {
+      canvas.toBlob(async (blob) => {
+        if (!blob) {
+          await copyToClipboard(text);
+          return;
+        }
+        try {
+          const file = new File([blob], 'daily-verdict-score.png', { type: 'image/png' });
+          await navigator.share({ text, files: [file] });
+          showToast('Shared!', 'success');
+        } catch {
+          await copyToClipboard(text);
+        }
+      });
+    } else {
+      await copyToClipboard(text);
+    }
+  } catch {
+    await copyToClipboard(text);
+  }
+}
+
+async function copyToClipboard(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast('Score copied to clipboard!', 'success');
+  } catch {
+    showToast('Could not copy to clipboard', 'error');
+  }
+}
+
 // ─── Archive View ───────────────────────────────────────────────────────────
+
+let archiveEntries: ArchiveEntry[] = [];
 
 async function loadArchive() {
   showView('archive');
@@ -540,16 +843,25 @@ async function loadArchive() {
 
   try {
     const data = await apiGet<{ entries: ArchiveEntry[] }>('/api/archive?days=7');
+    archiveEntries = data.entries;
 
     if (data.entries.length === 0) {
-      listEl.innerHTML = '<div class="archive-empty"><p>No past cases yet. Check back tomorrow!</p></div>';
+      listEl.innerHTML = `
+        <div class="archive-empty">
+          <div class="empty-state-icon">📋</div>
+          <p class="empty-state-title">No past cases yet</p>
+          <p class="empty-state-text">Check back after the next round!</p>
+        </div>
+      `;
       return;
     }
 
     listEl.innerHTML = '';
-    for (const entry of data.entries) {
+    for (let idx = 0; idx < data.entries.length; idx++) {
+      const entry = data.entries[idx]!;
       const item = document.createElement('div');
       item.className = 'archive-item';
+      item.dataset['archiveIdx'] = String(idx);
       item.innerHTML = `
         <div class="archive-item-date">${formatDate(entry.case.dateKey)}</div>
         <div class="archive-item-title">${escapeHtml(entry.case.title)}</div>
@@ -557,12 +869,103 @@ async function loadArchive() {
           <span class="archive-item-verdict" data-index="${entry.majorityIndex}">${escapeHtml(entry.majorityLabel)}</span>
           ${entry.userScore ? `<span class="archive-item-score">Your score: <strong>${entry.userScore.total}</strong></span>` : '<span class="archive-item-score">Not voted</span>'}
         </div>
+        <div class="archive-item-arrow">
+          <svg width="16" height="16" viewBox="0 0 20 20" fill="none"><path d="M7 4l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
       `;
+      item.addEventListener('click', () => showArchiveDetail(idx));
       listEl.appendChild(item);
     }
-  } catch (err) {
-    listEl.innerHTML = '<div class="archive-empty"><p>Failed to load archive.</p></div>';
+  } catch {
+    listEl.innerHTML = `
+      <div class="archive-empty">
+        <div class="empty-state-icon">⚠️</div>
+        <p class="empty-state-title">Failed to load</p>
+        <p class="empty-state-text">Could not load the archive.</p>
+      </div>
+    `;
   }
+}
+
+// ─── Archive Detail View ─────────────────────────────────────────────────────
+
+function showArchiveDetail(idx: number) {
+  const entry = archiveEntries[idx];
+  if (!entry) return;
+
+  showView('archive-detail');
+
+  const contentEl = document.getElementById('archive-detail-content');
+  if (!contentEl) return;
+
+  const { case: caseData, majorityIndex, majorityLabel, aggregate, userScore } = entry;
+  const labels = caseData.labels;
+  const total = aggregate.voters || 1;
+  const percentages = aggregate.counts.map((c) => Math.round((c / total) * 100)) as [number, number, number, number];
+
+  let html = `
+    <div class="case-card" style="margin:16px">
+      <div class="case-header">
+        <span class="case-date">${formatDate(caseData.dateKey)}</span>
+        <span class="case-status-badge">Revealed</span>
+      </div>
+      <h2 class="case-title">${escapeHtml(caseData.title)}</h2>
+      <p class="case-text">${escapeHtml(caseData.text)}</p>
+    </div>
+
+    <div class="verdict-stamp" data-majority="${majorityIndex}" style="padding-top:20px">
+      <div class="stamp-ring">
+        <div class="stamp-label">${escapeHtml(majorityLabel.toUpperCase())}</div>
+      </div>
+      <p class="stamp-voters">${aggregate.voters} voter${aggregate.voters !== 1 ? 's' : ''}</p>
+    </div>
+
+    <div class="results-chart" style="padding:16px">
+  `;
+
+  labels.forEach((label, i) => {
+    const isMaj = i === majorityIndex;
+    html += `
+      <div class="result-bar-row ${isMaj ? 'majority' : ''}">
+        <div class="result-bar-header">
+          <span class="result-bar-label">${escapeHtml(label)}</span>
+          <span class="result-bar-pct">${percentages[i]}%</span>
+        </div>
+        <div class="result-bar-track">
+          <div class="result-bar-fill" data-index="${i}" style="width: ${Math.max(percentages[i]!, 3)}%">
+            <span class="result-bar-count">${aggregate.counts[i]}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+
+  html += `</div>`;
+
+  if (userScore) {
+    html += `
+      <div class="score-card" style="margin:16px;animation:none">
+        <h3 class="score-title">Your Score</h3>
+        <div class="score-total">${userScore.total}</div>
+        <div class="score-breakdown">
+          <div class="score-row"><span class="score-row-label">Prediction</span><span class="score-row-value ${userScore.predictionMatch > 0 ? 'positive' : 'zero'}">+${userScore.predictionMatch}/60</span></div>
+          <div class="score-row"><span class="score-row-label">Verdict</span><span class="score-row-value ${userScore.verdictMatch > 0 ? 'positive' : 'zero'}">+${userScore.verdictMatch}/30</span></div>
+          <div class="score-row"><span class="score-row-label">Timing</span><span class="score-row-value ${userScore.timingBonus > 0 ? 'positive' : 'zero'}">+${userScore.timingBonus}/20</span></div>
+          <div class="score-row"><span class="score-row-label">Influence</span><span class="score-row-value ${userScore.influenceBonus > 0 ? 'positive' : 'zero'}">+${userScore.influenceBonus}/15</span></div>
+          <div class="score-row"><span class="score-row-label">Streak</span><span class="score-row-value ${userScore.streakBonus > 0 ? 'positive' : 'zero'}">+${userScore.streakBonus}/10</span></div>
+          <div class="score-row"><span class="score-row-label">Mini-Game</span><span class="score-row-value ${(userScore as ScoreBreakdown & { miniGameBonus?: number }).miniGameBonus ? 'positive' : 'zero'}">+${(userScore as ScoreBreakdown & { miniGameBonus?: number }).miniGameBonus ?? 0}/10</span></div>
+        </div>
+      </div>
+    `;
+  } else {
+    html += `
+      <div class="archive-empty" style="padding:24px">
+        <p>You didn't vote on this case.</p>
+      </div>
+    `;
+  }
+
+  contentEl.innerHTML = html;
 }
 
 // ─── Submit Case View ───────────────────────────────────────────────────────
@@ -583,14 +986,12 @@ function initSubmitView() {
     submitBtn.className = ready ? 'submit-case-btn ready' : 'submit-case-btn';
   }
 
-  // Only attach listeners once to prevent stacking
   if (!submitListenersAttached) {
     textArea.addEventListener('input', updateSubmitState);
     agreeCheckbox.addEventListener('change', updateSubmitState);
     submitListenersAttached = true;
   }
 
-  // Reset form
   textArea.value = '';
   if (charCount) charCount.textContent = '0';
   agreeCheckbox.checked = false;
@@ -616,7 +1017,6 @@ async function submitCase() {
     titleInput.value = '';
     textArea.value = '';
 
-    // Go back to previous view
     goBack();
   } catch (err) {
     showToast(err instanceof Error ? err.message : 'Failed to submit', 'error');
@@ -638,7 +1038,13 @@ async function loadModQueue() {
     const data = await apiGet<{ submissions: CaseSubmission[] }>('/api/mod/pending');
 
     if (data.submissions.length === 0) {
-      listEl.innerHTML = '<div class="archive-empty"><p>No pending submissions.</p></div>';
+      listEl.innerHTML = `
+        <div class="archive-empty">
+          <div class="empty-state-icon">✅</div>
+          <p class="empty-state-title">Queue clear!</p>
+          <p class="empty-state-text">No pending submissions.</p>
+        </div>
+      `;
       return;
     }
 
@@ -662,7 +1068,7 @@ async function loadModQueue() {
       listEl.appendChild(item);
     }
 
-    // Attach event listeners
+    // Approve buttons
     listEl.querySelectorAll('.mod-approve-btn').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const subId = (btn as HTMLButtonElement).dataset['subId']!;
@@ -676,35 +1082,65 @@ async function loadModQueue() {
         try {
           await apiPost('/api/mod/approve', { submissionId: subId, dateKey });
           showToast('Submission approved!', 'success');
-          await loadModQueue(); // Refresh
-        } catch (err) {
+          await loadModQueue();
+        } catch {
           showToast('Failed to approve', 'error');
         }
       });
     });
 
+    // Reject buttons - using custom modal instead of prompt()
     listEl.querySelectorAll('.mod-reject-btn').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const subId = (btn as HTMLButtonElement).dataset['subId']!;
-        const reason = prompt('Rejection reason:');
+
+        const reason = await showModal({
+          title: 'Reject Submission',
+          message: 'Please provide a reason for rejecting this submission.',
+          inputPlaceholder: 'Rejection reason...',
+          confirmLabel: 'Reject',
+          cancelLabel: 'Cancel',
+        });
+
         if (!reason) return;
+
         try {
           await apiPost('/api/mod/reject', { submissionId: subId, reason });
           showToast('Submission rejected', '');
-          await loadModQueue(); // Refresh
-        } catch (err) {
+          await loadModQueue();
+        } catch {
           showToast('Failed to reject', 'error');
         }
       });
     });
-  } catch (err) {
-    listEl.innerHTML = '<div class="archive-empty"><p>Failed to load mod queue.</p></div>';
+  } catch {
+    listEl.innerHTML = `
+      <div class="archive-empty">
+        <div class="empty-state-icon">⚠️</div>
+        <p class="empty-state-title">Failed to load</p>
+        <p class="empty-state-text">Could not load the mod queue.</p>
+      </div>
+    `;
   }
 }
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
 
 function goBack() {
+  if (currentView === 'archive-detail') {
+    loadArchive().catch(console.error);
+    return;
+  }
+  if (currentView === 'minigame') {
+    stopMinigame();
+    if (todayData) {
+      determineInitialView();
+    } else {
+      showView('loading');
+      init().catch(console.error);
+    }
+    return;
+  }
   if (todayData) {
     determineInitialView();
   } else {
@@ -725,8 +1161,8 @@ function startCountdown(targetTs: number, elementId: string) {
 
     if (diff <= 0) {
       el.textContent = 'Now!';
+      el.className = (el.className || '').replace(/urgency-\w+/g, '').trim();
       if (countdownTimer) clearInterval(countdownTimer);
-      // Auto-refresh after countdown ends
       setTimeout(() => {
         init().catch(console.error);
       }, 2000);
@@ -734,6 +1170,10 @@ function startCountdown(targetTs: number, elementId: string) {
     }
 
     el.textContent = formatCountdown(targetTs);
+
+    // Apply urgency colors
+    const urgency = getCountdownUrgency(targetTs);
+    el.className = (el.className || '').replace(/urgency-\w+/g, '').trim() + ' ' + urgency;
   }
 
   update();
@@ -747,7 +1187,7 @@ function animateCountUp(el: HTMLElement, target: number, duration: number) {
 
   function frame(now: number) {
     const progress = Math.min((now - start) / duration, 1);
-    const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+    const eased = 1 - Math.pow(1 - progress, 3);
     el.textContent = String(Math.round(target * eased));
     if (progress < 1) requestAnimationFrame(frame);
   }
@@ -774,7 +1214,7 @@ async function loadWeeklyLeaderboard() {
 
     weeklyList.innerHTML = '';
     if (data.top.length === 0) {
-      weeklyList.innerHTML = '<p style="padding:12px;text-align:center;font-size:13px;color:#6b7280">No weekly scores yet.</p>';
+      weeklyList.innerHTML = '<p class="lb-empty">No weekly scores yet.</p>';
       return;
     }
 
@@ -789,7 +1229,7 @@ async function loadWeeklyLeaderboard() {
       weeklyList.appendChild(row);
     }
   } catch {
-    weeklyList.innerHTML = '<p style="padding:12px;text-align:center;font-size:13px;color:#6b7280">Failed to load weekly leaderboard.</p>';
+    weeklyList.innerHTML = '<p class="lb-empty">Failed to load weekly leaderboard.</p>';
   }
 }
 
@@ -818,12 +1258,507 @@ function setupLeaderboardTabs() {
   });
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// GAVEL DROP MINI-GAME
+// Paratrooper-style: catch matching verdicts, dodge wrong ones, collect golden gavels
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface MiniGameItem {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  speed: number;
+  type: 'match' | 'wrong' | 'gavel' | 'hazard';
+  label: string;
+  color: string;
+  rotation: number;
+  rotSpeed: number;
+}
+
+interface MiniGameState {
+  running: boolean;
+  score: number;
+  lives: number;
+  maxLives: number;
+  catcherX: number;
+  catcherW: number;
+  items: MiniGameItem[];
+  spawnTimer: number;
+  spawnInterval: number;
+  elapsed: number;
+  animId: number | null;
+  lastTs: number;
+  labels: string[];
+  userVerdictIndex: number;
+  caseId: string;
+  bestScore: number;
+  moveLeft: boolean;
+  moveRight: boolean;
+  touchActive: boolean;
+}
+
+let mgState: MiniGameState | null = null;
+
+const MG_COLORS = ['#4caf50', '#f44336', '#ff9800', '#2196f3'];
+const MG_CATCHER_H = 16;
+const MG_CATCHER_SPEED = 320; // px/s
+const MG_ITEM_W = 70;
+const MG_ITEM_H = 32;
+
+function startMinigame() {
+  if (!todayData) return;
+
+  const labels = todayData.case.labels;
+  const userVerdictIndex = todayData.userVote?.verdictIndex ?? 0;
+  const caseId = todayData.case.caseId;
+
+  showView('minigame');
+
+  const canvas = document.getElementById('mg-canvas') as HTMLCanvasElement;
+  const container = document.getElementById('mg-container') as HTMLDivElement;
+  if (!canvas || !container) return;
+
+  canvas.width = container.clientWidth;
+  canvas.height = container.clientHeight - 48; // leave room for top bar
+
+  // Show start overlay, hide gameover
+  const startEl = document.getElementById('mg-start');
+  const gameoverEl = document.getElementById('mg-gameover');
+  if (startEl) startEl.classList.remove('hidden');
+  if (gameoverEl) gameoverEl.classList.add('hidden');
+
+  mgState = {
+    running: false,
+    score: 0,
+    lives: 3,
+    maxLives: 3,
+    catcherX: canvas.width / 2 - 40,
+    catcherW: 80,
+    items: [],
+    spawnTimer: 0,
+    spawnInterval: 1.2,
+    elapsed: 0,
+    animId: null,
+    lastTs: 0,
+    labels: [...labels],
+    userVerdictIndex,
+    caseId,
+    bestScore: 0,
+    moveLeft: false,
+    moveRight: false,
+    touchActive: false,
+  };
+
+  updateMGHud();
+}
+
+function beginMinigameLoop() {
+  if (!mgState) return;
+  mgState.running = true;
+  mgState.lastTs = performance.now();
+
+  const startEl = document.getElementById('mg-start');
+  if (startEl) startEl.classList.add('hidden');
+
+  function loop(ts: number) {
+    if (!mgState || !mgState.running) return;
+    const dt = Math.min((ts - mgState.lastTs) / 1000, 0.05);
+    mgState.lastTs = ts;
+    mgState.elapsed += dt;
+
+    updateMinigame(dt);
+    drawMinigame();
+
+    mgState.animId = requestAnimationFrame(loop);
+  }
+
+  mgState.animId = requestAnimationFrame(loop);
+}
+
+function stopMinigame() {
+  if (mgState?.animId) {
+    cancelAnimationFrame(mgState.animId);
+    mgState.animId = null;
+  }
+  if (mgState) mgState.running = false;
+}
+
+function updateMinigame(dt: number) {
+  if (!mgState) return;
+  const canvas = document.getElementById('mg-canvas') as HTMLCanvasElement;
+  if (!canvas) return;
+
+  const W = canvas.width;
+
+  // Move catcher
+  if (mgState.moveLeft) {
+    mgState.catcherX -= MG_CATCHER_SPEED * dt;
+  }
+  if (mgState.moveRight) {
+    mgState.catcherX += MG_CATCHER_SPEED * dt;
+  }
+  mgState.catcherX = Math.max(0, Math.min(W - mgState.catcherW, mgState.catcherX));
+
+  // Spawn items
+  mgState.spawnTimer -= dt;
+  if (mgState.spawnTimer <= 0) {
+    spawnMGItem(W);
+    // Speed up over time
+    mgState.spawnInterval = Math.max(0.4, 1.2 - mgState.elapsed * 0.01);
+    mgState.spawnTimer = mgState.spawnInterval;
+  }
+
+  // Update items
+  const catcherTop = canvas.height - MG_CATCHER_H - 8;
+  const catcherLeft = mgState.catcherX;
+  const catcherRight = mgState.catcherX + mgState.catcherW;
+
+  const newItems: MiniGameItem[] = [];
+  for (const item of mgState.items) {
+    item.y += item.speed * dt;
+    item.rotation += item.rotSpeed * dt;
+
+    // Check if caught by catcher
+    const itemCenterX = item.x + item.w / 2;
+    const itemBottom = item.y + item.h;
+
+    if (itemBottom >= catcherTop && item.y <= catcherTop + MG_CATCHER_H + 4) {
+      if (itemCenterX >= catcherLeft && itemCenterX <= catcherRight) {
+        // Caught!
+        handleMGCatch(item);
+        continue; // remove item
+      }
+    }
+
+    // Remove if off screen
+    if (item.y > canvas.height + 20) {
+      continue;
+    }
+
+    newItems.push(item);
+  }
+
+  mgState.items = newItems;
+
+  // Check game over
+  if (mgState.lives <= 0) {
+    endMinigame();
+  }
+}
+
+function spawnMGItem(canvasW: number) {
+  if (!mgState) return;
+
+  const rand = Math.random();
+  let type: MiniGameItem['type'];
+  let label: string;
+  let color: string;
+
+  if (rand < 0.15) {
+    // Golden gavel
+    type = 'gavel';
+    label = '🔨';
+    color = '#f0c040';
+  } else if (rand < 0.25) {
+    // Hazard
+    type = 'hazard';
+    label = '✕';
+    color = '#f44336';
+  } else if (rand < 0.55) {
+    // Matching verdict
+    type = 'match';
+    label = mgState.labels[mgState.userVerdictIndex] ?? 'Match';
+    color = MG_COLORS[mgState.userVerdictIndex] ?? '#4caf50';
+  } else {
+    // Wrong verdict
+    const wrongIdx = (mgState.userVerdictIndex + 1 + Math.floor(Math.random() * 3)) % 4;
+    type = 'wrong';
+    label = mgState.labels[wrongIdx] ?? 'Wrong';
+    color = MG_COLORS[wrongIdx] ?? '#f44336';
+  }
+
+  const speed = 100 + mgState.elapsed * 2 + Math.random() * 60;
+
+  mgState.items.push({
+    x: Math.random() * (canvasW - MG_ITEM_W),
+    y: -MG_ITEM_H - Math.random() * 30,
+    w: MG_ITEM_W,
+    h: MG_ITEM_H,
+    speed,
+    type,
+    label,
+    color,
+    rotation: 0,
+    rotSpeed: (Math.random() - 0.5) * 2,
+  });
+}
+
+function handleMGCatch(item: MiniGameItem) {
+  if (!mgState) return;
+
+  switch (item.type) {
+    case 'match':
+      mgState.score += 10;
+      break;
+    case 'gavel':
+      mgState.score += 25;
+      break;
+    case 'wrong':
+      mgState.lives--;
+      break;
+    case 'hazard':
+      mgState.lives--;
+      break;
+  }
+
+  updateMGHud();
+}
+
+function updateMGHud() {
+  if (!mgState) return;
+  const scoreEl = document.getElementById('mg-hud-score');
+  const livesEl = document.getElementById('mg-hud-lives');
+  if (scoreEl) scoreEl.textContent = String(mgState.score);
+  if (livesEl) {
+    livesEl.textContent = '❤️'.repeat(Math.max(0, mgState.lives)) + '🖤'.repeat(Math.max(0, mgState.maxLives - mgState.lives));
+  }
+}
+
+function drawMinigame() {
+  if (!mgState) return;
+  const canvas = document.getElementById('mg-canvas') as HTMLCanvasElement;
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const W = canvas.width;
+  const H = canvas.height;
+
+  // Background
+  ctx.fillStyle = '#0a0a18';
+  ctx.fillRect(0, 0, W, H);
+
+  // Subtle grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.02)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < W; x += 40) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, H);
+    ctx.stroke();
+  }
+
+  // Draw items
+  for (const item of mgState.items) {
+    ctx.save();
+    ctx.translate(item.x + item.w / 2, item.y + item.h / 2);
+    ctx.rotate(item.rotation * 0.1);
+
+    if (item.type === 'gavel') {
+      // Golden gavel — special item
+      ctx.fillStyle = 'rgba(240, 192, 64, 0.15)';
+      ctx.beginPath();
+      ctx.roundRect(-item.w / 2, -item.h / 2, item.w, item.h, 8);
+      ctx.fill();
+      ctx.strokeStyle = '#f0c040';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = '#f0c040';
+      ctx.font = 'bold 16px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🔨', 0, 0);
+    } else if (item.type === 'hazard') {
+      // Red X hazard
+      ctx.fillStyle = 'rgba(244, 67, 54, 0.1)';
+      ctx.beginPath();
+      ctx.roundRect(-item.w / 2, -item.h / 2, item.w, item.h, 8);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(244, 67, 54, 0.6)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.strokeStyle = '#f44336';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(-10, -10);
+      ctx.lineTo(10, 10);
+      ctx.moveTo(10, -10);
+      ctx.lineTo(-10, 10);
+      ctx.stroke();
+    } else {
+      // Verdict stamp
+      const bgAlpha = item.type === 'match' ? 0.2 : 0.1;
+      ctx.fillStyle = item.color + Math.round(bgAlpha * 255).toString(16).padStart(2, '0');
+      ctx.beginPath();
+      ctx.roundRect(-item.w / 2, -item.h / 2, item.w, item.h, 8);
+      ctx.fill();
+      ctx.strokeStyle = item.color;
+      ctx.lineWidth = item.type === 'match' ? 2 : 1;
+      ctx.stroke();
+
+      ctx.fillStyle = item.color;
+      ctx.font = `bold ${item.label.length > 10 ? 9 : 11}px -apple-system, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(item.label, 0, 0);
+    }
+
+    ctx.restore();
+  }
+
+  // Draw catcher (platform)
+  const catcherY = H - MG_CATCHER_H - 8;
+  const grad = ctx.createLinearGradient(mgState.catcherX, catcherY, mgState.catcherX, catcherY + MG_CATCHER_H);
+  grad.addColorStop(0, '#f0c040');
+  grad.addColorStop(1, '#d4a017');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.roundRect(mgState.catcherX, catcherY, mgState.catcherW, MG_CATCHER_H, 6);
+  ctx.fill();
+
+  // Catcher highlight
+  ctx.fillStyle = 'rgba(255,255,255,0.2)';
+  ctx.beginPath();
+  ctx.roundRect(mgState.catcherX + 4, catcherY + 2, mgState.catcherW - 8, 4, 2);
+  ctx.fill();
+
+  // Floor line
+  ctx.strokeStyle = 'rgba(240, 192, 64, 0.2)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, H - 4);
+  ctx.lineTo(W, H - 4);
+  ctx.stroke();
+}
+
+async function endMinigame() {
+  if (!mgState) return;
+  mgState.running = false;
+  if (mgState.animId) {
+    cancelAnimationFrame(mgState.animId);
+    mgState.animId = null;
+  }
+
+  const score = mgState.score;
+
+  // Post score
+  try {
+    const result = await apiPost<{ success: boolean; bestScore: number }>('/api/minigame-score', {
+      caseId: mgState.caseId,
+      score,
+    });
+    mgState.bestScore = result.bestScore;
+  } catch {
+    mgState.bestScore = score;
+  }
+
+  // Show game over overlay
+  const gameoverEl = document.getElementById('mg-gameover');
+  const scoreEl = document.getElementById('mg-gameover-score');
+  const bestEl = document.getElementById('mg-gameover-best');
+  if (gameoverEl) gameoverEl.classList.remove('hidden');
+  if (scoreEl) scoreEl.textContent = String(score);
+  if (bestEl) bestEl.textContent = `Best: ${mgState.bestScore}`;
+}
+
+function retryMinigame() {
+  const gameoverEl = document.getElementById('mg-gameover');
+  if (gameoverEl) gameoverEl.classList.add('hidden');
+  startMinigame();
+  beginMinigameLoop();
+}
+
+function setupMinigameControls() {
+  const canvas = document.getElementById('mg-canvas') as HTMLCanvasElement;
+  if (!canvas) return;
+
+  // Touch controls: left half = move left, right half = move right
+  canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    if (!mgState || !mgState.running) return;
+    const rect = canvas.getBoundingClientRect();
+    for (let i = 0; i < e.touches.length; i++) {
+      const touch = e.touches[i]!;
+      const x = touch.clientX - rect.left;
+      if (x < rect.width / 2) {
+        mgState.moveLeft = true;
+      } else {
+        mgState.moveRight = true;
+      }
+    }
+    mgState.touchActive = true;
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    if (!mgState) return;
+    mgState.moveLeft = false;
+    mgState.moveRight = false;
+    // Check remaining touches
+    const rect = canvas.getBoundingClientRect();
+    for (let i = 0; i < e.touches.length; i++) {
+      const touch = e.touches[i]!;
+      const x = touch.clientX - rect.left;
+      if (x < rect.width / 2) {
+        mgState.moveLeft = true;
+      } else {
+        mgState.moveRight = true;
+      }
+    }
+    if (e.touches.length === 0) mgState.touchActive = false;
+  }, { passive: false });
+
+  canvas.addEventListener('touchcancel', () => {
+    if (!mgState) return;
+    mgState.moveLeft = false;
+    mgState.moveRight = false;
+    mgState.touchActive = false;
+  });
+
+  // Keyboard controls
+  document.addEventListener('keydown', (e) => {
+    if (!mgState || !mgState.running) return;
+    if (e.key === 'ArrowLeft' || e.key === 'a') mgState.moveLeft = true;
+    if (e.key === 'ArrowRight' || e.key === 'd') mgState.moveRight = true;
+  });
+
+  document.addEventListener('keyup', (e) => {
+    if (!mgState) return;
+    if (e.key === 'ArrowLeft' || e.key === 'a') mgState.moveLeft = false;
+    if (e.key === 'ArrowRight' || e.key === 'd') mgState.moveRight = false;
+  });
+
+  // Mouse controls (for desktop)
+  canvas.addEventListener('mousedown', (e) => {
+    if (!mgState || !mgState.running || mgState.touchActive) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    if (x < rect.width / 2) {
+      mgState.moveLeft = true;
+    } else {
+      mgState.moveRight = true;
+    }
+  });
+
+  canvas.addEventListener('mouseup', () => {
+    if (!mgState || mgState.touchActive) return;
+    mgState.moveLeft = false;
+    mgState.moveRight = false;
+  });
+
+  canvas.addEventListener('mouseleave', () => {
+    if (!mgState || mgState.touchActive) return;
+    mgState.moveLeft = false;
+    mgState.moveRight = false;
+  });
+}
+
 // ─── Event Listeners ─────────────────────────────────────────────────────────
 
 function setupEventListeners() {
   // Submit vote
-  const submitVoteBtn = document.getElementById('submit-vote-btn');
-  submitVoteBtn?.addEventListener('click', () => {
+  document.getElementById('submit-vote-btn')?.addEventListener('click', () => {
     submitVote().catch(console.error);
   });
 
@@ -850,8 +1785,14 @@ function setupEventListeners() {
 
   // Back buttons
   document.getElementById('btn-back-archive')?.addEventListener('click', goBack);
+  document.getElementById('btn-back-archive-detail')?.addEventListener('click', goBack);
   document.getElementById('btn-back-submit')?.addEventListener('click', goBack);
   document.getElementById('btn-back-mod')?.addEventListener('click', goBack);
+
+  // Share score
+  document.getElementById('btn-share-score')?.addEventListener('click', () => {
+    shareScore().catch(console.error);
+  });
 
   // Comment mark
   document.getElementById('btn-commented')?.addEventListener('click', async () => {
@@ -865,7 +1806,7 @@ function setupEventListeners() {
         btn.disabled = true;
       }
       showToast('Comment recorded! Influence tracking started.', 'success');
-    } catch (err) {
+    } catch {
       showToast('Failed to record comment', 'error');
     }
   });
@@ -883,6 +1824,30 @@ function setupEventListeners() {
 
   // Leaderboard tabs
   setupLeaderboardTabs();
+
+  // ─── Minigame buttons ──────────────────────────────────────────────────────
+  document.getElementById('btn-play-minigame-voted')?.addEventListener('click', () => {
+    startMinigame();
+  });
+
+  document.getElementById('btn-play-minigame-open')?.addEventListener('click', () => {
+    startMinigame();
+  });
+
+  document.getElementById('btn-back-minigame')?.addEventListener('click', goBack);
+
+  document.getElementById('mg-start-btn')?.addEventListener('click', () => {
+    beginMinigameLoop();
+  });
+
+  document.getElementById('mg-retry')?.addEventListener('click', () => {
+    retryMinigame();
+  });
+
+  document.getElementById('mg-done')?.addEventListener('click', goBack);
+
+  // Setup minigame touch/keyboard/mouse controls
+  setupMinigameControls();
 }
 
 // ─── Start ───────────────────────────────────────────────────────────────────

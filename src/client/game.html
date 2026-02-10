@@ -13,8 +13,15 @@
       <!-- ═══ Loading State ═══ -->
       <div class="view" id="view-loading">
         <div class="loading-spinner">
-          <div class="gavel-icon">⚖️</div>
-          <p class="loading-text">Loading today's case...</p>
+          <div class="branded-loader">
+            <div class="loader-scale">
+              <div class="scale-beam"></div>
+              <div class="scale-pan left"></div>
+              <div class="scale-pan right"></div>
+              <div class="scale-base"></div>
+            </div>
+          </div>
+          <p class="loading-text">Loading this round's case...</p>
         </div>
       </div>
 
@@ -66,6 +73,15 @@
           </div>
         </div>
 
+        <!-- Mini-Game CTA -->
+        <div class="minigame-cta" style="padding:0 16px">
+          <button class="minigame-play-btn" id="btn-play-minigame-open">
+            <span class="minigame-play-icon">🔨</span>
+            Play Gavel Drop
+            <span class="minigame-play-hint">Earn up to +10 bonus points!</span>
+          </button>
+        </div>
+
         <!-- Sticky Submit Bar -->
         <div class="sticky-submit" id="sticky-submit">
           <button class="submit-btn" id="submit-vote-btn" disabled>
@@ -114,6 +130,14 @@
             <p class="comment-cta-hint">Persuading others can earn you an Influence Bonus (+15 pts)</p>
             <button class="comment-btn" id="btn-commented">I Left a Comment</button>
           </div>
+
+          <div class="minigame-cta">
+            <button class="minigame-play-btn" id="btn-play-minigame-voted">
+              <span class="minigame-play-icon">🔨</span>
+              Play Gavel Drop
+              <span class="minigame-play-hint">Earn up to +10 bonus points!</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -146,7 +170,7 @@
             <p class="reveal-countdown-value" id="closed-countdown"></p>
           </div>
 
-          <p class="closed-hint">Come back tomorrow to vote on the next case!</p>
+          <p class="closed-hint">A new round starts every 2 hours!</p>
         </div>
       </div>
 
@@ -189,12 +213,21 @@
           </div>
         </div>
 
+        <!-- Share Your Score -->
+        <div class="share-card" id="share-card">
+          <button class="share-btn" id="btn-share-score">
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M15 7a3 3 0 100-6 3 3 0 000 6zM5 13a3 3 0 100-6 3 3 0 000 6zM15 19a3 3 0 100-6 3 3 0 000 6zM7.59 11.51l4.83 2.98M12.41 5.51l-4.83 2.98" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Share Your Score
+          </button>
+          <canvas id="share-canvas" class="share-canvas hidden" width="600" height="400"></canvas>
+        </div>
+
         <!-- Streak -->
         <div class="streak-card" id="streak-card">
           <div class="streak-flame">🔥</div>
           <div class="streak-info">
             <span class="streak-count" id="streak-count">0</span>
-            <span class="streak-label">day streak</span>
+            <span class="streak-label">round streak</span>
           </div>
           <div class="streak-best">
             Best: <span id="streak-best">0</span>
@@ -204,7 +237,7 @@
         <!-- Leaderboard -->
         <div class="leaderboard-card" id="leaderboard-card">
           <div class="lb-tabs">
-            <button class="lb-tab active" id="lb-tab-daily" data-tab="daily">Today</button>
+            <button class="lb-tab active" id="lb-tab-daily" data-tab="daily">This Round</button>
             <button class="lb-tab" id="lb-tab-weekly" data-tab="weekly">This Week</button>
           </div>
           <div class="lb-list" id="lb-list">
@@ -240,6 +273,21 @@
           </div>
         </div>
         <div class="archive-list" id="archive-list">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- ═══ Archive Detail State ═══ -->
+      <div class="view hidden" id="view-archive-detail">
+        <div class="top-bar">
+          <div class="top-bar-left">
+            <button class="icon-btn" id="btn-back-archive-detail" title="Back to Archive">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M13 4L7 10L13 16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <span class="brand-name">Case Detail</span>
+          </div>
+        </div>
+        <div class="archive-detail-content" id="archive-detail-content">
           <!-- Populated by JS -->
         </div>
       </div>
@@ -295,13 +343,74 @@
         </div>
       </div>
 
+      <!-- ═══ Mini-Game: Gavel Drop ═══ -->
+      <div class="view hidden" id="view-minigame">
+        <div class="top-bar">
+          <div class="top-bar-left">
+            <button class="icon-btn" id="btn-back-minigame" title="Back">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M13 4L7 10L13 16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <span class="brand-name">Gavel Drop</span>
+          </div>
+          <div class="top-bar-right">
+            <span class="mg-hud-score" id="mg-hud-score">0</span>
+            <span class="mg-hud-lives" id="mg-hud-lives">❤️❤️❤️</span>
+          </div>
+        </div>
+        <div class="mg-container" id="mg-container">
+          <canvas id="mg-canvas" class="mg-canvas"></canvas>
+          <!-- Game Over overlay -->
+          <div class="mg-gameover hidden" id="mg-gameover">
+            <div class="mg-gameover-card">
+              <h2 class="mg-gameover-title">Game Over!</h2>
+              <div class="mg-gameover-score" id="mg-gameover-score">0</div>
+              <p class="mg-gameover-label">points</p>
+              <p class="mg-gameover-best" id="mg-gameover-best"></p>
+              <div class="mg-gameover-actions">
+                <button class="mg-btn mg-btn-retry" id="mg-retry">Play Again</button>
+                <button class="mg-btn mg-btn-back" id="mg-done">Done</button>
+              </div>
+            </div>
+          </div>
+          <!-- Start overlay -->
+          <div class="mg-start" id="mg-start">
+            <div class="mg-start-card">
+              <div class="mg-start-icon">🔨</div>
+              <h2 class="mg-start-title">Gavel Drop</h2>
+              <p class="mg-start-desc">Catch verdict stamps matching your vote!<br>Avoid wrong verdicts. Collect golden gavels for bonus.</p>
+              <p class="mg-start-controls">Tap left/right to move</p>
+              <button class="mg-btn mg-btn-start" id="mg-start-btn">Start Game</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- ═══ Error State ═══ -->
       <div class="view hidden" id="view-error">
         <div class="error-card">
-          <div class="error-icon">😔</div>
+          <div class="error-icon-container">
+            <svg class="error-gavel" width="64" height="64" viewBox="0 0 64 64" fill="none">
+              <rect x="18" y="8" width="28" height="10" rx="3" fill="#4b5563"/>
+              <rect x="28" y="16" width="8" height="24" rx="2" fill="#374151"/>
+              <rect x="20" y="38" width="24" height="4" rx="2" fill="#4b5563"/>
+            </svg>
+          </div>
           <h2 class="error-title">Something went wrong</h2>
           <p class="error-message" id="error-message">Failed to load the game.</p>
           <button class="retry-btn" id="retry-btn">Try Again</button>
+        </div>
+      </div>
+
+      <!-- ═══ Custom Modal (replaces browser prompt) ═══ -->
+      <div class="modal-overlay hidden" id="modal-overlay">
+        <div class="modal-card" id="modal-card">
+          <h3 class="modal-title" id="modal-title">Confirm</h3>
+          <p class="modal-message" id="modal-message"></p>
+          <input type="text" class="modal-input hidden" id="modal-input" placeholder="" />
+          <div class="modal-actions">
+            <button class="modal-btn modal-btn-cancel" id="modal-cancel">Cancel</button>
+            <button class="modal-btn modal-btn-confirm" id="modal-confirm">Confirm</button>
+          </div>
         </div>
       </div>
     </div>

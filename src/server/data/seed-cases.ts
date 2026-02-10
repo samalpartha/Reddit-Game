@@ -1,7 +1,7 @@
 import type { Case } from '../../shared/types';
 import { DEFAULT_LABELS } from '../../shared/types';
 
-// 14 seed cases to ensure the game never goes dark.
+// 32 seed cases to ensure the game never goes dark.
 // Each case is a moral/social dilemma designed for Reddit-style debate.
 
 interface SeedCase {
@@ -81,25 +81,120 @@ export const SEED_CASES: SeedCase[] = [
     text: "Someone at your gym has been using a machine for 45 minutes during peak hours, mostly scrolling their phone between sets. You politely ask to work in and they say they have 'two more sets.' Twenty minutes later they're still there. The gym has a 30-minute limit sign posted.",
     labels: ['Get Staff Involved', 'Wait Patiently', 'Ask Again Firmly', 'Find Another Machine'],
   },
+  // ─── New Cases: Reddit Culture ─────────────────────────────────────────
+  {
+    title: 'The Repost Callout',
+    text: "You see a post on a subreddit that's clearly a repost from last week. It already has 500 upvotes. You check the original poster and they're different from the current one. Do you call them out in the comments, report it to mods, let it be since people are enjoying it, or downvote and move on?",
+    labels: ['Call Out in Comments', 'Report to Mods', 'Let People Enjoy It', 'Downvote and Move On'],
+  },
+  {
+    title: 'The Surprise Inheritance',
+    text: "Your grandmother left $100,000 split equally among 4 grandchildren. Your cousin (who visited her every week for 10 years) says the split is unfair because the rest of you rarely visited. She wants 40% and the rest split 20% each. She did handle all her care.",
+    labels: ['Equal Split Is Fair', "Cousin Deserves More", 'Compromise at 30/23/23/23', 'Respect the Will Exactly'],
+  },
+  {
+    title: 'The Social Media Ghost',
+    text: "You've been dating someone for 3 months. Everything seems great in person, but you notice they haven't posted anything about you on social media. Meanwhile, they post about friends, food, and trips constantly. When you bring it up, they say 'I keep my love life private.' Is that a red flag?",
+    labels: ['Totally Fine', 'Definitely a Red Flag', 'Slightly Suspicious', 'They Should Compromise'],
+  },
+  {
+    title: 'The Rescue Dog Debate',
+    text: "Your friend spent $3,000 buying a designer breed dog from a breeder. You mentioned that shelters are full of dogs that need homes. They got upset and said it's their money and they wanted a specific breed for allergy reasons. Now there's tension.",
+    labels: ['Their Money, Their Choice', "Should've Adopted", 'Allergies Justify It', "Shouldn't Have Said Anything"],
+  },
+  {
+    title: 'The WFH Spy',
+    text: "Your company just installed monitoring software on all WFH laptops that tracks keystrokes, screenshots, and mouse movement. Your manager says it's 'for productivity metrics.' Some colleagues are furious, others say 'if you're working, what's the problem?' You have to decide whether to speak up.",
+    labels: ['Totally Unacceptable', "It's Reasonable", 'Depends on Implementation', 'Time to Find a New Job'],
+  },
+  {
+    title: 'The Birthday Party Snub',
+    text: "Your friend is having a birthday dinner at an expensive restaurant ($80+ per person). You can't afford it but don't want to say so. When you say you can't make it, they say 'I only turn 30 once' and guilt-trip you. Another friend offers to cover your meal, but that feels embarrassing.",
+    labels: ['Go, Accept the Help', 'Be Honest About Money', "Skip It, It's OK", 'Suggest a Cheaper Alternative'],
+  },
+  {
+    title: 'The Vacation Photo Ethics',
+    text: "You're on vacation and take a group photo with friends. One friend looks terrible in the photo. Everyone else looks great. You want to post it. When you ask, they say 'please don't post it.' But it's the only group photo from the whole trip.",
+    labels: ['Respect Their Wish', 'Post It Anyway', 'Crop or Edit Them', 'Ask the Group to Vote'],
+  },
+  {
+    title: 'The Nosy Coworker',
+    text: "A coworker keeps asking about your salary during casual conversation. Company policy doesn't prohibit sharing, and salary transparency is legal. But you make significantly more than them (same role, you negotiated harder). Sharing could cause drama but help them negotiate.",
+    labels: ['Share Openly', 'Deflect Politely', 'Share Privately', 'Redirect to HR'],
+  },
+  {
+    title: 'The Roommate Thermostat War',
+    text: "You and your roommate constantly fight about the thermostat. You run hot and want AC at 68°F. They're always cold and want heat at 74°F. You split utilities evenly. Last month, the electric bill was $280. They secretly changed the thermostat while you were at work.",
+    labels: ['68 Is Reasonable', '74 Is Reasonable', 'Split the Difference (71)', 'Get Separate Heaters/Fans'],
+  },
+  {
+    title: 'The Late-Night Text',
+    text: "Your ex texts you at 2am saying they miss you and made a mistake. You've been in a new relationship for 4 months and things are going well. You haven't told your current partner about the text yet. Your ex wants to meet for coffee 'just to talk.'",
+    labels: ['Ignore Completely', 'Meet for Coffee', 'Tell Current Partner First', 'Reply but No Meeting'],
+  },
+  {
+    title: 'The Queue Jumper',
+    text: "You've been in a long line at a popular food truck for 25 minutes. Someone walks up to a friend near the front and starts chatting, then casually places an order with them. Nobody else in line says anything. You're 3 spots behind them.",
+    labels: ['Call Them Out', "Not Worth the Drama", 'Tell the Server', 'Loudly Comment So They Hear'],
+  },
+  {
+    title: 'The AI Art Controversy',
+    text: "Your friend entered an art contest and won first place using an AI-generated image they slightly edited. The rules didn't explicitly ban AI art. Other artists who spent weeks on their pieces are furious. Your friend says 'the prompt and editing IS the art.' Was it wrong?",
+    labels: ['Totally Wrong', 'Fair Game', "Wrong but Rules Allow It", 'Art Is Evolving'],
+  },
+  {
+    title: 'The Student Loan Gift',
+    text: "Your parents paid off your sibling's $50K student loans as a 'graduation gift.' When you graduated (same degree, same school), they said they can't afford to do the same for you because the economy changed. Your sibling thinks you should just deal with it.",
+    labels: ['Parents Should Be Fair', 'Life Isn\'t Always Fair', 'Parents Owe You Too', 'Sibling Should Help'],
+  },
+  {
+    title: 'The Potluck Freeloader',
+    text: "Your friend group does monthly potlucks. One person always brings a bag of chips while everyone else cooks elaborate dishes. They eat everything but never put in effort. When someone finally mentioned it, they said 'I can't cook and chips are a valid contribution.'",
+    labels: ['Chips Are Fine', 'Put in More Effort', 'Assign Dishes Next Time', "Don't Invite Them"],
+  },
+  {
+    title: 'The Gaming Rage Quit',
+    text: "You're playing a competitive team game online. Your teammate makes a costly mistake in a ranked match that loses the game. In voice chat, another teammate absolutely tears into them with insults. The person who made the mistake is clearly upset. Do you say something?",
+    labels: ['Defend the Player', 'Stay Silent', 'Tell Rager to Chill', 'Report and Mute'],
+  },
+  {
+    title: 'The Subscription Trap',
+    text: "You discover your friend has been sharing your streaming account password with 5 other people without asking. Your service is slow now and you got a warning from the platform. When you confronted them, they said 'you weren't even using it that much.'",
+    labels: ['Change Password Now', 'Let It Slide', 'Ask Them to Split Cost', 'Confront and Set Rules'],
+  },
+  {
+    title: 'The Elevator Pitch',
+    text: "You're in an elevator. Someone sneezes loudly without covering their mouth. Another person says 'that's disgusting.' The sneezer says 'I have allergies, it came out of nowhere.' The commenter doubles down: 'still should cover your mouth.' Whose side are you on?",
+    labels: ['Sneezer Should Cover', 'It Was Involuntary', 'Commenter Was Rude', 'Both Were Wrong'],
+  },
+  {
+    title: 'The Used Car Dilemma',
+    text: "You're selling your car privately. You know there's a small engine issue that only shows up occasionally. It passed inspection. The buyer seems really excited and mentions it's for their teenager's first car. Do you disclose the intermittent issue?",
+    labels: ['Must Disclose', 'Passed Inspection, Fine', 'Offer a Discount Instead', 'Depends on Severity'],
+  },
 ];
 
 /**
- * Get a seed case for a given date index (cycles through all 14 cases).
+ * Get a seed case for a given date index (cycles through all cases).
  */
 export function getSeedCase(index: number): SeedCase {
   return SEED_CASES[index % SEED_CASES.length]!;
 }
 
 /**
- * Get a seed case for a specific date key.
- * Uses the day-of-year modulo to cycle through cases.
+ * Get a seed case for a specific cycle key.
+ * Cycle keys are YYYYMMDDHH (10 chars) or YYYYMMDD (8 chars legacy).
+ * Uses day-of-year * 12 + hourSlot to cycle through all cases across 2-hour rounds.
  */
 export function getSeedCaseForDate(dateKey: string): SeedCase {
   const y = parseInt(dateKey.slice(0, 4), 10);
   const m = parseInt(dateKey.slice(4, 6), 10) - 1;
   const d = parseInt(dateKey.slice(6, 8), 10);
+  const h = dateKey.length >= 10 ? parseInt(dateKey.slice(8, 10), 10) : 0;
   const date = new Date(y, m, d);
   const startOfYear = new Date(y, 0, 1);
   const dayOfYear = Math.floor((date.getTime() - startOfYear.getTime()) / 86400000);
-  return getSeedCase(dayOfYear);
+  const hourSlot = Math.floor(h / 2); // 0..11
+  const index = dayOfYear * 12 + hourSlot;
+  return getSeedCase(index);
 }

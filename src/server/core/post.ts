@@ -4,7 +4,7 @@ import { getSeedCaseForDate } from '../data/seed-cases';
 import { CASE_OPEN_HOURS, REVEAL_DELAY_HOURS } from '../../shared/types';
 
 /**
- * Create a Daily Verdict post for today's case.
+ * Create a Daily Verdict post for the current round's case.
  */
 export async function createDailyPost(): Promise<{ id: string }> {
   const subId = context.subredditName;
@@ -39,16 +39,20 @@ export async function createDailyPost(): Promise<{ id: string }> {
     await saveCase(caseData);
   }
 
-  // Format date for title
+  // Format date + time for title
   const d = new Date();
   const months = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
   ];
   const dateStr = `${months[d.getMonth()]} ${d.getDate()}`;
+  const hours = d.getUTCHours();
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  const h12 = hours % 12 || 12;
+  const timeStr = `${h12}${ampm} UTC`;
 
   const post = await reddit.submitCustomPost({
-    title: `Daily Verdict ${dateStr}: ${caseData.title}`,
+    title: `Daily Verdict ${dateStr} ${timeStr}: ${caseData.title}`,
   });
 
   // Link case to post
@@ -56,4 +60,3 @@ export async function createDailyPost(): Promise<{ id: string }> {
 
   return post;
 }
-
