@@ -1,7 +1,7 @@
 {
   "private": true,
-  "name": "daily-verdict",
-  "version": "1.0.0",
+  "name": "red-dit-game",
+  "version": "0.0.0",
   "description": "Daily Verdict - A social prediction game for Reddit",
   "license": "BSD-3-Clause",
   "type": "module",
