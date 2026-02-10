@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Daily Verdict – Reveal</title>
+    <link rel="stylesheet" href="style.css" />
+    <script type="module" src="main.ts"></script>
+  </head>
+  <body>
+    <!-- Loading overlay for GameMaker -->
+    <div class="loading" id="loading">
+      <div class="spinner" id="spinner"></div>
+      <div class="status" id="status">Loading Reveal...</div>
+      <progress value="0" max="100" id="progress" hidden></progress>
+    </div>
+
+    <!-- GameMaker Canvas -->
+    <canvas class="game-canvas" id="canvas" tabindex="-1"></canvas>
+
+    <!-- Fallback Reveal (shown if GameMaker fails to load) -->
+    <div class="fallback-reveal hidden" id="fallback-reveal">
+      <div class="fb-container">
+        <div class="fb-header">
+          <span class="fb-icon">⚖️</span>
+          <h1 class="fb-title">The Verdict Is In</h1>
+        </div>
+
+        <div class="fb-stamp" id="fb-stamp">
+          <div class="fb-stamp-ring">
+            <div class="fb-stamp-text" id="fb-stamp-text">LOADING</div>
+          </div>
+        </div>
+
+        <div class="fb-chart" id="fb-chart">
+          <!-- Populated by JS -->
+        </div>
+
+        <div class="fb-score-section">
+          <div class="fb-score-label">Your Score</div>
+          <div class="fb-score-value" id="fb-score-value">0</div>
+          <div class="fb-score-detail" id="fb-score-detail"></div>
+        </div>
+
+        <div class="fb-streak" id="fb-streak">
+          <span class="fb-streak-fire">🔥</span>
+          <span class="fb-streak-text" id="fb-streak-text">0 day streak</span>
+        </div>
+
+        <button class="fb-done-btn" id="fb-done-btn">Done</button>
+      </div>
+    </div>
+  </body>
+</html>

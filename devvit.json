@@ -1,0 +1,75 @@
+{
+  "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
+  "name": "daily-verdict",
+  "post": {
+    "dir": "dist/client",
+    "entrypoints": {
+      "default": {
+        "entry": "splash.html",
+        "inline": true
+      },
+      "game": {
+        "entry": "game.html"
+      },
+      "reveal": {
+        "entry": "index.html"
+      }
+    }
+  },
+  "server": {
+    "dir": "dist/server",
+    "entry": "index.cjs"
+  },
+  "menu": {
+    "items": [
+      {
+        "label": "Create Daily Verdict Post",
+        "description": "Create today's Daily Verdict case",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/post-create"
+      },
+      {
+        "label": "Open Mod Queue",
+        "description": "Review pending case submissions",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/mod-queue"
+      }
+    ]
+  },
+  "forms": {
+    "submitCase": "/internal/form/submit-case"
+  },
+  "triggers": {
+    "onAppInstall": "/internal/triggers/on-app-install"
+  },
+  "scheduler": {
+    "tasks": [
+      {
+        "name": "daily-post",
+        "cron": "0 12 * * *",
+        "endpoint": "/internal/scheduler/daily-post"
+      },
+      {
+        "name": "snapshots",
+        "cron": "*/10 * * * *",
+        "endpoint": "/internal/scheduler/snapshots"
+      },
+      {
+        "name": "close-cases",
+        "cron": "*/5 * * * *",
+        "endpoint": "/internal/scheduler/close"
+      },
+      {
+        "name": "reveal-cases",
+        "cron": "*/5 * * * *",
+        "endpoint": "/internal/scheduler/reveal"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch"
+  }
+}
