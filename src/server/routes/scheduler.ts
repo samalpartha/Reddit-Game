@@ -13,7 +13,7 @@ import {
   saveCase,
 } from '../services/redis';
 import { computeUserScore, computeMajority } from '../services/scoring';
-import { CASE_OPEN_HOURS, REVEAL_DELAY_HOURS, DEFAULT_LABELS } from '../../shared/types';
+import { CASE_OPEN_HOURS, REVEAL_DELAY_HOURS, DEFAULT_LABELS, REVEAL_SCAN_DAYS } from '../../shared/types';
 import { getSeedCaseForDate } from '../data/seed-cases';
 import type { Case } from '../../shared/types';
 
@@ -24,10 +24,13 @@ export const scheduler = new Hono();
 
 scheduler.post('/daily-post', async (c) => {
   try {
-    const subId = context.subredditName ?? 'default';
+    const subId = context.subredditName;
+    if (!subId) {
+      return c.json({ status: 'error', message: 'Missing subreddit context' }, 400);
+    }
     const dateKey = getTodayDateKey();
 
-    // Check if case already exists for today
+    // Check if a post already exists for today
     const existing = await getCaseByDate(subId, dateKey);
     if (existing?.postId) {
       return c.json({
@@ -40,10 +43,11 @@ scheduler.post('/daily-post', async (c) => {
     const approvedSub = await getApprovedSubmissionForDate(subId, dateKey);
     const now = Date.now();
 
-    if (approvedSub && !existing) {
-      // Create case from approved submission
+    if (approvedSub) {
+      // Prefer approved UGC submission over any auto-created seed case
+      const caseId = existing?.caseId ?? `${subId}-${dateKey}`;
       const caseData: Case = {
-        caseId: `${subId}-${dateKey}`,
+        caseId,
         subId,
         dateKey,
         title: approvedSub.title ?? 'Community Case',
@@ -140,12 +144,15 @@ scheduler.post('/reveal', async (c) => {
   try {
     // We need to check closed cases. Since we removed them from open set,
     // we'll check based on today and recent dates.
-    const subId = context.subredditName ?? 'default';
+    const subId = context.subredditName;
+    if (!subId) {
+      return c.json({ status: 'error', message: 'Missing subreddit context' }, 400);
+    }
     const now = Date.now();
     let revealedCount = 0;
 
-    // Check last 3 days of cases for potential reveals
-    for (let daysAgo = 0; daysAgo < 3; daysAgo++) {
+    // Check recent days of cases for potential reveals
+    for (let daysAgo = 0; daysAgo < REVEAL_SCAN_DAYS; daysAgo++) {
       const d = new Date(now - daysAgo * 86400000);
       const y = d.getFullYear();
       const m = String(d.getMonth() + 1).padStart(2, '0');

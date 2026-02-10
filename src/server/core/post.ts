@@ -1,14 +1,16 @@
 import { reddit, context } from '@devvit/web/server';
 import { getTodayDateKey, getCaseByDate, updateCasePostId, saveCase } from '../services/redis';
 import { getSeedCaseForDate } from '../data/seed-cases';
-import { CASE_OPEN_HOURS, REVEAL_DELAY_HOURS, DEFAULT_LABELS } from '../../shared/types';
-import type { Case } from '../../shared/types';
+import { CASE_OPEN_HOURS, REVEAL_DELAY_HOURS } from '../../shared/types';
 
 /**
  * Create a Daily Verdict post for today's case.
  */
 export async function createDailyPost(): Promise<{ id: string }> {
-  const subId = context.subredditName ?? 'default';
+  const subId = context.subredditName;
+  if (!subId) {
+    throw new Error('Cannot create post: missing subreddit context');
+  }
   const dateKey = getTodayDateKey();
 
   // Ensure case exists
@@ -55,22 +57,3 @@ export async function createDailyPost(): Promise<{ id: string }> {
   return post;
 }
 
-/**
- * Create a post with a specific case (for mod-triggered creation).
- */
-export async function createPostForCase(caseData: Case): Promise<{ id: string }> {
-  const d = new Date();
-  const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-  ];
-  const dateStr = `${months[d.getMonth()]} ${d.getDate()}`;
-
-  const post = await reddit.submitCustomPost({
-    title: `Daily Verdict ${dateStr}: ${caseData.title}`,
-  });
-
-  await updateCasePostId(caseData.caseId, post.id);
-
-  return post;
-}

@@ -90,10 +90,9 @@ async function init() {
 
     // Set up GameMaker event handler
     window.DV_onGameMakerEvent = (event: GameMakerEvent) => {
-      if (event.type === 'reveal_complete') {
-        console.log('GameMaker reveal complete');
-      } else if (event.type === 'stamp_pressed') {
-        console.log('Stamp pressed in GameMaker');
+      // Handle GameMaker events (reveal_complete, stamp_pressed)
+      if (event.type === 'reveal_complete' || event.type === 'stamp_pressed') {
+        // Event handled - can be extended with UI actions here
       }
     };
 
@@ -151,11 +150,10 @@ async function loadGameMaker() {
     script.type = 'text/javascript';
 
     script.onload = () => {
-      console.log('GameMaker runner loaded');
+      // GameMaker runner loaded successfully
     };
 
     script.onerror = () => {
-      console.error('GameMaker runner failed to load');
       showFallbackReveal();
     };
 
@@ -164,7 +162,6 @@ async function loadGameMaker() {
     // Set a timeout – if GM doesn't render within 10s, fallback
     setTimeout(() => {
       if (canvasEl.style.display === 'none' || !canvasEl.classList.contains('active')) {
-        console.warn('GameMaker timed out, showing fallback');
         showFallbackReveal();
       }
     }, 10000);
@@ -255,8 +252,8 @@ function setupGameMakerGlobals() {
   };
   window.g_pWadLoadCallback = undefined;
   window.setWadLoadCallback = (cb: any) => { window.g_pWadLoadCallback = cb; };
-  window.onFirstFrameRendered = () => { console.log('First frame rendered!'); };
-  window.onGameSetWindowSize = (w: number, h: number) => { console.log(`GM size: ${w}x${h}`); };
+  window.onFirstFrameRendered = () => { /* First frame rendered */ };
+  window.onGameSetWindowSize = () => { /* Window size set by GameMaker */ };
   window.triggerAd = () => {};
   window.triggerPayment = () => {};
   window.toggleElement = (id: string) => {

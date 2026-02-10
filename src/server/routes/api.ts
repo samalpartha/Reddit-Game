@@ -75,7 +75,11 @@ async function ensureAuth(): Promise<{ userId: string; username: string } | null
 }
 
 function getSubId(): string {
-  return context.subredditName ?? 'default';
+  if (!context.subredditName) {
+    // This shouldn't happen in production, but handle gracefully
+    console.warn('Missing subredditName in context, using fallback');
+  }
+  return context.subredditName ?? '_global';
 }
 
 async function requireMod(): Promise<{ userId: string; username: string }> {

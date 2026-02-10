@@ -88,7 +88,6 @@ class GameMakerBridge {
    * Handle an incoming event from GameMaker.
    */
   private handleEvent(event: GameMakerEvent): void {
-    console.log(`[GM Bridge] Event: ${event.type}`, event.data);
 
     if (event.type === 'ready') {
       this._ready = true;
@@ -98,8 +97,8 @@ class GameMakerBridge {
     for (const cb of callbacks) {
       try {
         cb(event);
-      } catch (err) {
-        console.error(`[GM Bridge] Error in callback for ${event.type}:`, err);
+      } catch {
+        // Callback error - silently continue
       }
     }
 
@@ -108,8 +107,8 @@ class GameMakerBridge {
     for (const cb of wildcardCallbacks) {
       try {
         cb(event);
-      } catch (err) {
-        console.error(`[GM Bridge] Error in wildcard callback:`, err);
+      } catch {
+        // Wildcard callback error - silently continue
       }
     }
   }
@@ -122,9 +121,8 @@ class GameMakerBridge {
     const fn = (window as unknown as Record<string, unknown>)[`DV_GM_${command}`];
     if (typeof fn === 'function') {
       (fn as (data: string) => void)(JSON.stringify(data ?? {}));
-    } else {
-      console.warn(`[GM Bridge] GameMaker function DV_GM_${command} not found`);
     }
+    // If function not found, silently skip (GameMaker not loaded)
   }
 
   /**
@@ -145,8 +143,15 @@ class GameMakerBridge {
   }
 }
 
-// Singleton
-export const gmBridge = new GameMakerBridge();
+/**
+ * Create a new bridge instance.
+ * Note: main.ts has its own inline implementation for the reveal page.
+ * This class is available for use if the GameMaker integration is
+ * expanded to other views.
+ */
+export function createGameMakerBridge(): GameMakerBridge {
+  return new GameMakerBridge();
+}
 
 // Extend Window for TypeScript
 declare global {

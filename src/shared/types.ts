@@ -208,3 +208,4 @@ export const MAX_SUBMISSION_LENGTH = 600;
 export const MAX_SUBMISSIONS_PER_DAY = 3;
 export const INFLUENCE_THRESHOLD_PCT = 3; // 3 percentage point increase
 export const SNAPSHOT_INTERVAL_MINUTES = 10;
+export const REVEAL_SCAN_DAYS = 3; // How many days back the reveal scheduler scans

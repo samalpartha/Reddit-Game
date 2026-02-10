@@ -175,13 +175,22 @@ export async function getSnapshots(caseId: string): Promise<Snapshot[]> {
 }
 
 export async function getSnapshotAfterTs(caseId: string, ts: number): Promise<Snapshot | null> {
-  // Get the first snapshot after the given timestamp
-  const entries = await redis.zRange(keys.snapshotIndex(caseId), ts, '+inf');
-  if (entries.length === 0) return null;
+  // Get the first snapshot after the given timestamp using score-based range.
+  // Devvit Redis zRange with numeric start/stop and sorted set uses scores.
+  // Fetch all snapshots (by rank) then filter by timestamp.
+  const allEntries = await redis.zRange(keys.snapshotIndex(caseId), 0, -1);
+  if (allEntries.length === 0) return null;
 
-  const firstTs = Number(entries[0]!.member);
-  const raw = await redis.get(keys.snapshot(caseId, firstTs));
-  return raw ? (JSON.parse(raw) as Snapshot) : null;
+  // Find the first snapshot with ts >= given ts
+  for (const entry of allEntries) {
+    const snapTs = Number(entry.member);
+    if (snapTs >= ts) {
+      const raw = await redis.get(keys.snapshot(caseId, snapTs));
+      return raw ? (JSON.parse(raw) as Snapshot) : null;
+    }
+  }
+
+  return null;
 }
 
 // ─── Score Operations ────────────────────────────────────────────────────────
