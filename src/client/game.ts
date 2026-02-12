@@ -1259,58 +1259,100 @@ function setupLeaderboardTabs() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// GAVEL DROP MINI-GAME
-// Paratrooper-style: catch matching verdicts, dodge wrong ones, collect golden gavels
+// VERDICT COURTROOM MINI-GAME
+// Defend your verdict against rapid-fire counter-arguments through strategic responses
 // ═══════════════════════════════════════════════════════════════════════════════
 
-interface MiniGameItem {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  speed: number;
-  type: 'match' | 'wrong' | 'gavel' | 'hazard';
-  label: string;
-  color: string;
-  rotation: number;
-  rotSpeed: number;
+type ResponseType = 'agree' | 'refute' | 'deflect';
+
+interface Challenge {
+  id: number;
+  argument: string;
+  correctResponse: ResponseType;
+  verdictIndex: number; // Which verdict this challenges (0-3)
+  difficulty: 1 | 2 | 3; // Affects time pressure
 }
 
-interface MiniGameState {
+interface DebateState {
   running: boolean;
+  verdict: string;
+  verdictIndex: number;
+  challenges: Challenge[];
+  currentIndex: number;
   score: number;
-  lives: number;
-  maxLives: number;
-  catcherX: number;
-  catcherW: number;
-  items: MiniGameItem[];
-  spawnTimer: number;
-  spawnInterval: number;
-  elapsed: number;
+  credibility: number; // 0-100, visual "health"
+  maxCredibility: number;
+  timePerChallenge: number; // seconds
+  timeRemaining: number;
   animId: number | null;
   lastTs: number;
-  labels: string[];
-  userVerdictIndex: number;
   caseId: string;
   bestScore: number;
-  moveLeft: boolean;
-  moveRight: boolean;
-  touchActive: boolean;
+  feedbackMessage: string;
+  showingFeedback: boolean;
 }
 
-let mgState: MiniGameState | null = null;
+let debateState: DebateState | null = null;
 
-const MG_COLORS = ['#4caf50', '#f44336', '#ff9800', '#2196f3'];
-const MG_CATCHER_H = 16;
-const MG_CATCHER_SPEED = 320; // px/s
-const MG_ITEM_W = 70;
-const MG_ITEM_H = 32;
+const CHALLENGE_TEMPLATES = {
+  refute: [
+    "Your verdict ignores the fact that {point}",
+    "But {counterexample} proves you wrong",
+    "You're overlooking {aspect} entirely",
+    "{alternative} is clearly more important"
+  ],
+  agree: [
+    "You're right that {weakness} is a problem",
+    "Fair point about {concession}",
+    "I agree {commonground} matters most"
+  ],
+  deflect: [
+    "The real issue here is {distraction}",
+    "We should focus on {tangent} instead",
+    "That's not what we're discussing"
+  ]
+} as const;
+
+// Generate challenges for the debate
+function generateChallenges(verdictIndex: number, verdictLabel: string): Challenge[] {
+  const challenges: Challenge[] = [];
+  const allResponses: ResponseType[] = ['refute', 'agree', 'deflect'];
+
+  // Generate 10 challenges with varying difficulty
+  for (let i = 0; i < 10; i++) {
+    const difficulty = i < 3 ? 1 : i < 7 ? 2 : 3;
+    const responseType = allResponses[Math.floor(Math.random() * allResponses.length)]!;
+    const templates = CHALLENGE_TEMPLATES[responseType];
+    const template = templates[Math.floor(Math.random() * templates.length)]!;
+
+    // Simple placeholder replacement for demo
+    const argument = template.replace('{point}', 'this contradicts the facts')
+      .replace('{counterexample}', 'the evidence')
+      .replace('{aspect}', 'context')
+      .replace('{alternative}', 'another perspective')
+      .replace('{weakness}', 'the argument has flaws')
+      .replace('{concession}', 'there are valid concerns')
+      .replace('{commonground}', 'evidence matters')
+      .replace('{distraction}', 'something else entirely')
+      .replace('{tangent}', 'a different topic');
+
+    challenges.push({
+      id: i,
+      argument,
+      correctResponse: responseType,
+      verdictIndex,
+      difficulty
+    });
+  }
+
+  return challenges;
+}
 
 function startMinigame() {
   if (!todayData) return;
 
-  const labels = todayData.case.labels;
-  const userVerdictIndex = todayData.userVote?.verdictIndex ?? 0;
+  const verdictIndex = todayData.userVote?.verdictIndex ?? 0;
+  const verdict = todayData.case.labels[verdictIndex] ?? 'Unknown';
   const caseId = todayData.case.caseId;
 
   showView('minigame');
@@ -1320,213 +1362,158 @@ function startMinigame() {
   if (!canvas || !container) return;
 
   canvas.width = container.clientWidth;
-  canvas.height = container.clientHeight - 48; // leave room for top bar
+  canvas.height = container.clientHeight - 48;
 
-  // Show start overlay, hide gameover
+  // Show start overlay
   const startEl = document.getElementById('mg-start');
   const gameoverEl = document.getElementById('mg-gameover');
   if (startEl) startEl.classList.remove('hidden');
   if (gameoverEl) gameoverEl.classList.add('hidden');
 
-  mgState = {
+  debateState = {
     running: false,
+    verdict,
+    verdictIndex,
+    challenges: generateChallenges(verdictIndex, verdict),
+    currentIndex: 0,
     score: 0,
-    lives: 3,
-    maxLives: 3,
-    catcherX: canvas.width / 2 - 40,
-    catcherW: 80,
-    items: [],
-    spawnTimer: 0,
-    spawnInterval: 1.2,
-    elapsed: 0,
+    credibility: 100,
+    maxCredibility: 100,
+    timePerChallenge: 5,
+    timeRemaining: 5,
     animId: null,
     lastTs: 0,
-    labels: [...labels],
-    userVerdictIndex,
     caseId,
     bestScore: 0,
-    moveLeft: false,
-    moveRight: false,
-    touchActive: false,
+    feedbackMessage: '',
+    showingFeedback: false
   };
 
-  updateMGHud();
+  updateDebateHud();
 }
 
 function beginMinigameLoop() {
-  if (!mgState) return;
-  mgState.running = true;
-  mgState.lastTs = performance.now();
+  if (!debateState) return;
+  debateState.running = true;
+  debateState.lastTs = performance.now();
+  debateState.timeRemaining = debateState.timePerChallenge;
 
   const startEl = document.getElementById('mg-start');
   if (startEl) startEl.classList.add('hidden');
 
   function loop(ts: number) {
-    if (!mgState || !mgState.running) return;
-    const dt = Math.min((ts - mgState.lastTs) / 1000, 0.05);
-    mgState.lastTs = ts;
-    mgState.elapsed += dt;
+    if (!debateState || !debateState.running) return;
+    const dt = Math.min((ts - debateState.lastTs) / 1000, 0.05);
+    debateState.lastTs = ts;
 
     updateMinigame(dt);
     drawMinigame();
 
-    mgState.animId = requestAnimationFrame(loop);
+    debateState.animId = requestAnimationFrame(loop);
   }
 
-  mgState.animId = requestAnimationFrame(loop);
+  debateState.animId = requestAnimationFrame(loop);
 }
 
 function stopMinigame() {
-  if (mgState?.animId) {
-    cancelAnimationFrame(mgState.animId);
-    mgState.animId = null;
+  if (debateState?.animId) {
+    cancelAnimationFrame(debateState.animId);
+    debateState.animId = null;
   }
-  if (mgState) mgState.running = false;
+  if (debateState) debateState.running = false;
 }
 
 function updateMinigame(dt: number) {
-  if (!mgState) return;
-  const canvas = document.getElementById('mg-canvas') as HTMLCanvasElement;
-  if (!canvas) return;
+  if (!debateState || !debateState.running) return;
 
-  const W = canvas.width;
-
-  // Move catcher
-  if (mgState.moveLeft) {
-    mgState.catcherX -= MG_CATCHER_SPEED * dt;
-  }
-  if (mgState.moveRight) {
-    mgState.catcherX += MG_CATCHER_SPEED * dt;
-  }
-  mgState.catcherX = Math.max(0, Math.min(W - mgState.catcherW, mgState.catcherX));
-
-  // Spawn items
-  mgState.spawnTimer -= dt;
-  if (mgState.spawnTimer <= 0) {
-    spawnMGItem(W);
-    // Speed up over time
-    mgState.spawnInterval = Math.max(0.4, 1.2 - mgState.elapsed * 0.01);
-    mgState.spawnTimer = mgState.spawnInterval;
+  // Handle feedback display
+  if (debateState.showingFeedback) {
+    return; // Pause during feedback
   }
 
-  // Update items
-  const catcherTop = canvas.height - MG_CATCHER_H - 8;
-  const catcherLeft = mgState.catcherX;
-  const catcherRight = mgState.catcherX + mgState.catcherW;
+  // Count down timer
+  debateState.timeRemaining -= dt;
 
-  const newItems: MiniGameItem[] = [];
-  for (const item of mgState.items) {
-    item.y += item.speed * dt;
-    item.rotation += item.rotSpeed * dt;
-
-    // Check if caught by catcher
-    const itemCenterX = item.x + item.w / 2;
-    const itemBottom = item.y + item.h;
-
-    if (itemBottom >= catcherTop && item.y <= catcherTop + MG_CATCHER_H + 4) {
-      if (itemCenterX >= catcherLeft && itemCenterX <= catcherRight) {
-        // Caught!
-        handleMGCatch(item);
-        continue; // remove item
-      }
-    }
-
-    // Remove if off screen
-    if (item.y > canvas.height + 20) {
-      continue;
-    }
-
-    newItems.push(item);
+  if (debateState.timeRemaining <= 0) {
+    // Time's up - treat as wrong answer
+    handleResponse('deflect', true); // Auto-deflect on timeout
   }
 
-  mgState.items = newItems;
-
-  // Check game over
-  if (mgState.lives <= 0) {
-    endMinigame();
-  }
+  updateDebateHud();
 }
 
-function spawnMGItem(canvasW: number) {
-  if (!mgState) return;
+function handleResponse(playerResponse: ResponseType, isTimeout = false) {
+  if (!debateState) return;
 
-  const rand = Math.random();
-  let type: MiniGameItem['type'];
-  let label: string;
-  let color: string;
+  const challenge = debateState.challenges[debateState.currentIndex];
+  if (!challenge) return;
 
-  if (rand < 0.15) {
-    // Golden gavel
-    type = 'gavel';
-    label = '🔨';
-    color = '#f0c040';
-  } else if (rand < 0.25) {
-    // Hazard
-    type = 'hazard';
-    label = '✕';
-    color = '#f44336';
-  } else if (rand < 0.55) {
-    // Matching verdict
-    type = 'match';
-    label = mgState.labels[mgState.userVerdictIndex] ?? 'Match';
-    color = MG_COLORS[mgState.userVerdictIndex] ?? '#4caf50';
+  const isCorrect = !isTimeout && playerResponse === challenge.correctResponse;
+
+  // Scoring
+  if (isCorrect) {
+    if (playerResponse === 'refute') {
+      debateState.score += 15;
+      debateState.feedbackMessage = '✓ Strong rebuttal!';
+    } else if (playerResponse === 'deflect') {
+      debateState.score += 5;
+      debateState.feedbackMessage = '✓ Smart deflection';
+    } else {
+      debateState.score += 10;
+      debateState.feedbackMessage = '✓ Good concession';
+    }
+
+    // Time bonus
+    if (debateState.timeRemaining > 3) {
+      debateState.score += 5;
+      debateState.feedbackMessage += ' +5 speed';
+    }
+  } else if (isTimeout) {
+    debateState.credibility -= 15;
+    debateState.feedbackMessage = '⏱️ Time ran out!';
   } else {
-    // Wrong verdict
-    const wrongIdx = (mgState.userVerdictIndex + 1 + Math.floor(Math.random() * 3)) % 4;
-    type = 'wrong';
-    label = mgState.labels[wrongIdx] ?? 'Wrong';
-    color = MG_COLORS[wrongIdx] ?? '#f44336';
+    debateState.credibility -= 10;
+    debateState.feedbackMessage = '✕ Weak response';
   }
 
-  const speed = 100 + mgState.elapsed * 2 + Math.random() * 60;
+  // Show feedback briefly
+  debateState.showingFeedback = true;
+  updateDebateHud();
 
-  mgState.items.push({
-    x: Math.random() * (canvasW - MG_ITEM_W),
-    y: -MG_ITEM_H - Math.random() * 30,
-    w: MG_ITEM_W,
-    h: MG_ITEM_H,
-    speed,
-    type,
-    label,
-    color,
-    rotation: 0,
-    rotSpeed: (Math.random() - 0.5) * 2,
-  });
+  setTimeout(() => {
+    if (!debateState) return;
+    debateState.showingFeedback = false;
+    debateState.currentIndex++;
+
+    if (debateState.currentIndex >= debateState.challenges.length || debateState.credibility <= 0) {
+      // Game over
+      void endMinigame();
+    } else {
+      // Next challenge
+      debateState.timeRemaining = debateState.timePerChallenge;
+      updateDebateHud();
+    }
+  }, 1200); // 1.2s feedback display
 }
 
-function handleMGCatch(item: MiniGameItem) {
-  if (!mgState) return;
+function updateDebateHud() {
+  if (!debateState) return;
 
-  switch (item.type) {
-    case 'match':
-      mgState.score += 10;
-      break;
-    case 'gavel':
-      mgState.score += 25;
-      break;
-    case 'wrong':
-      mgState.lives--;
-      break;
-    case 'hazard':
-      mgState.lives--;
-      break;
-  }
-
-  updateMGHud();
-}
-
-function updateMGHud() {
-  if (!mgState) return;
   const scoreEl = document.getElementById('mg-hud-score');
   const livesEl = document.getElementById('mg-hud-lives');
-  if (scoreEl) scoreEl.textContent = String(mgState.score);
+
+  if (scoreEl) scoreEl.textContent = String(debateState.score);
+
+  // Use credibility as "lives" display
   if (livesEl) {
-    livesEl.textContent = '❤️'.repeat(Math.max(0, mgState.lives)) + '🖤'.repeat(Math.max(0, mgState.maxLives - mgState.lives));
+    const credPercent = Math.max(0, Math.min(100, debateState.credibility));
+    const hearts = Math.ceil(credPercent / 34); // 0-3 hearts
+    livesEl.textContent = '💬'.repeat(Math.max(0, hearts)) + '💭'.repeat(Math.max(0, 3 - hearts));
   }
 }
 
 function drawMinigame() {
-  if (!mgState) return;
+  if (!debateState) return;
   const canvas = document.getElementById('mg-canvas') as HTMLCanvasElement;
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
@@ -1535,122 +1522,126 @@ function drawMinigame() {
   const W = canvas.width;
   const H = canvas.height;
 
-  // Background
-  ctx.fillStyle = '#0a0a18';
+  // Background - courtroom theme
+  const gradient = ctx.createLinearGradient(0, 0, 0, H);
+  gradient.addColorStop(0, '#1a1a2e');
+  gradient.addColorStop(1, '#0a0a18');
+  ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, W, H);
 
-  // Subtle grid
-  ctx.strokeStyle = 'rgba(255,255,255,0.02)';
-  ctx.lineWidth = 1;
-  for (let x = 0; x < W; x += 40) {
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, H);
-    ctx.stroke();
+  // Decorative elements
+  ctx.strokeStyle = 'rgba(240, 192, 64, 0.1)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(20, 20, W - 40, H - 40);
+
+  if (debateState.showingFeedback) {
+    // Show feedback message
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 24px -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(debateState.feedbackMessage, W / 2, H / 2);
+    return;
   }
 
-  // Draw items
-  for (const item of mgState.items) {
-    ctx.save();
-    ctx.translate(item.x + item.w / 2, item.y + item.h / 2);
-    ctx.rotate(item.rotation * 0.1);
+  const challenge = debateState.challenges[debateState.currentIndex];
+  if (!challenge) return;
 
-    if (item.type === 'gavel') {
-      // Golden gavel — special item
-      ctx.fillStyle = 'rgba(240, 192, 64, 0.15)';
-      ctx.beginPath();
-      ctx.roundRect(-item.w / 2, -item.h / 2, item.w, item.h, 8);
-      ctx.fill();
-      ctx.strokeStyle = '#f0c040';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      ctx.fillStyle = '#f0c040';
-      ctx.font = 'bold 16px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('🔨', 0, 0);
-    } else if (item.type === 'hazard') {
-      // Red X hazard
-      ctx.fillStyle = 'rgba(244, 67, 54, 0.1)';
-      ctx.beginPath();
-      ctx.roundRect(-item.w / 2, -item.h / 2, item.w, item.h, 8);
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(244, 67, 54, 0.6)';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      ctx.strokeStyle = '#f44336';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(-10, -10);
-      ctx.lineTo(10, 10);
-      ctx.moveTo(10, -10);
-      ctx.lineTo(-10, 10);
-      ctx.stroke();
+  // Progress indicator
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  ctx.font = '14px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(`Challenge ${debateState.currentIndex + 1} of ${debateState.challenges.length}`, W / 2, 40);
+
+  // Your verdict badge
+  ctx.fillStyle = 'rgba(76, 175, 80, 0.2)';
+  ctx.fillRect(30, 70, W - 60, 50);
+  ctx.strokeStyle = '#4caf50';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(30, 70, W - 60, 50);
+
+  ctx.fillStyle = '#4caf50';
+  ctx.font = 'bold 16px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(`Your Verdict: "${debateState.verdict}"`, W / 2, 95);
+
+  // Challenge text
+  ctx.fillStyle = '#fff';
+  ctx.font = '18px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+
+  // Word wrap the challenge
+  const words = challenge.argument.split(' ');
+  let line = '';
+  let y = 160;
+  const maxWidth = W - 80;
+
+  for (const word of words) {
+    const testLine = line + word + ' ';
+    const metrics = ctx.measureText(testLine);
+    if (metrics.width > maxWidth && line.length > 0) {
+      ctx.fillText(line, W / 2, y);
+      line = word + ' ';
+      y += 30;
     } else {
-      // Verdict stamp
-      const bgAlpha = item.type === 'match' ? 0.2 : 0.1;
-      ctx.fillStyle = item.color + Math.round(bgAlpha * 255).toString(16).padStart(2, '0');
-      ctx.beginPath();
-      ctx.roundRect(-item.w / 2, -item.h / 2, item.w, item.h, 8);
-      ctx.fill();
-      ctx.strokeStyle = item.color;
-      ctx.lineWidth = item.type === 'match' ? 2 : 1;
-      ctx.stroke();
-
-      ctx.fillStyle = item.color;
-      ctx.font = `bold ${item.label.length > 10 ? 9 : 11}px -apple-system, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(item.label, 0, 0);
+      line = testLine;
     }
-
-    ctx.restore();
   }
+  ctx.fillText(line, W / 2, y);
 
-  // Draw catcher (platform)
-  const catcherY = H - MG_CATCHER_H - 8;
-  const grad = ctx.createLinearGradient(mgState.catcherX, catcherY, mgState.catcherX, catcherY + MG_CATCHER_H);
-  grad.addColorStop(0, '#f0c040');
-  grad.addColorStop(1, '#d4a017');
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.roundRect(mgState.catcherX, catcherY, mgState.catcherW, MG_CATCHER_H, 6);
-  ctx.fill();
+  // Timer bar
+  const timerY = H - 120;
+  const timerWidth = W - 60;
+  const timerFill = (debateState.timeRemaining / debateState.timePerChallenge) * timerWidth;
 
-  // Catcher highlight
-  ctx.fillStyle = 'rgba(255,255,255,0.2)';
-  ctx.beginPath();
-  ctx.roundRect(mgState.catcherX + 4, catcherY + 2, mgState.catcherW - 8, 4, 2);
-  ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.1)';
+  ctx.fillRect(30, timerY, timerWidth, 8);
 
-  // Floor line
-  ctx.strokeStyle = 'rgba(240, 192, 64, 0.2)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(0, H - 4);
-  ctx.lineTo(W, H - 4);
-  ctx.stroke();
+  const timerColor = debateState.timeRemaining < 2 ? '#f44336' : debateState.timeRemaining < 3.5 ? '#ff9800' : '#4caf50';
+  ctx.fillStyle = timerColor;
+  ctx.fillRect(30, timerY, timerFill, 8);
+
+  // Credibility bar
+  const credY = H - 90;
+  const credFill = (debateState.credibility / debateState.maxCredibility) * timerWidth;
+
+  ctx.fillStyle = 'rgba(255,255,255,0.05)';
+  ctx.fillRect(30, credY, timerWidth, 6);
+
+  ctx.fillStyle = '#2196f3';
+  ctx.fillRect(30, credY, credFill, 6);
+
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.font = '12px -apple-system, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('Credibility', 30, credY - 8);
+
+  // Response button hints (actual buttons are in HTML)
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.font = '14px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('Choose your response below', W / 2, H - 50);
 }
 
 async function endMinigame() {
-  if (!mgState) return;
-  mgState.running = false;
-  if (mgState.animId) {
-    cancelAnimationFrame(mgState.animId);
-    mgState.animId = null;
+  if (!debateState) return;
+  debateState.running = false;
+  if (debateState.animId) {
+    cancelAnimationFrame(debateState.animId);
+    debateState.animId = null;
   }
 
-  const score = mgState.score;
+  const score = debateState.score;
 
   // Post score
   try {
     const result = await apiPost<{ success: boolean; bestScore: number }>('/api/minigame-score', {
-      caseId: mgState.caseId,
+      caseId: debateState.caseId,
       score,
     });
-    mgState.bestScore = result.bestScore;
+    debateState.bestScore = result.bestScore;
   } catch {
-    mgState.bestScore = score;
+    debateState.bestScore = score;
   }
 
   // Show game over overlay
@@ -1659,7 +1650,7 @@ async function endMinigame() {
   const bestEl = document.getElementById('mg-gameover-best');
   if (gameoverEl) gameoverEl.classList.remove('hidden');
   if (scoreEl) scoreEl.textContent = String(score);
-  if (bestEl) bestEl.textContent = `Best: ${mgState.bestScore}`;
+  if (bestEl) bestEl.textContent = `Best: ${debateState.bestScore}`;
 }
 
 function retryMinigame() {
@@ -1670,87 +1661,22 @@ function retryMinigame() {
 }
 
 function setupMinigameControls() {
-  const canvas = document.getElementById('mg-canvas') as HTMLCanvasElement;
-  if (!canvas) return;
+  // Response buttons
+  const agreeBtn = document.getElementById('mg-response-agree');
+  const refuteBtn = document.getElementById('mg-response-refute');
+  const deflectBtn = document.getElementById('mg-response-deflect');
 
-  // Touch controls: left half = move left, right half = move right
-  canvas.addEventListener('touchstart', (e) => {
-    e.preventDefault();
-    if (!mgState || !mgState.running) return;
-    const rect = canvas.getBoundingClientRect();
-    for (let i = 0; i < e.touches.length; i++) {
-      const touch = e.touches[i]!;
-      const x = touch.clientX - rect.left;
-      if (x < rect.width / 2) {
-        mgState.moveLeft = true;
-      } else {
-        mgState.moveRight = true;
-      }
-    }
-    mgState.touchActive = true;
-  }, { passive: false });
+  agreeBtn?.addEventListener('click', () => handleResponse('agree'));
+  refuteBtn?.addEventListener('click', () => handleResponse('refute'));
+  deflectBtn?.addEventListener('click', () => handleResponse('deflect'));
 
-  canvas.addEventListener('touchend', (e) => {
-    e.preventDefault();
-    if (!mgState) return;
-    mgState.moveLeft = false;
-    mgState.moveRight = false;
-    // Check remaining touches
-    const rect = canvas.getBoundingClientRect();
-    for (let i = 0; i < e.touches.length; i++) {
-      const touch = e.touches[i]!;
-      const x = touch.clientX - rect.left;
-      if (x < rect.width / 2) {
-        mgState.moveLeft = true;
-      } else {
-        mgState.moveRight = true;
-      }
-    }
-    if (e.touches.length === 0) mgState.touchActive = false;
-  }, { passive: false });
-
-  canvas.addEventListener('touchcancel', () => {
-    if (!mgState) return;
-    mgState.moveLeft = false;
-    mgState.moveRight = false;
-    mgState.touchActive = false;
-  });
-
-  // Keyboard controls
+  // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
-    if (!mgState || !mgState.running) return;
-    if (e.key === 'ArrowLeft' || e.key === 'a') mgState.moveLeft = true;
-    if (e.key === 'ArrowRight' || e.key === 'd') mgState.moveRight = true;
-  });
+    if (!debateState || !debateState.running || debateState.showingFeedback) return;
 
-  document.addEventListener('keyup', (e) => {
-    if (!mgState) return;
-    if (e.key === 'ArrowLeft' || e.key === 'a') mgState.moveLeft = false;
-    if (e.key === 'ArrowRight' || e.key === 'd') mgState.moveRight = false;
-  });
-
-  // Mouse controls (for desktop)
-  canvas.addEventListener('mousedown', (e) => {
-    if (!mgState || !mgState.running || mgState.touchActive) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    if (x < rect.width / 2) {
-      mgState.moveLeft = true;
-    } else {
-      mgState.moveRight = true;
-    }
-  });
-
-  canvas.addEventListener('mouseup', () => {
-    if (!mgState || mgState.touchActive) return;
-    mgState.moveLeft = false;
-    mgState.moveRight = false;
-  });
-
-  canvas.addEventListener('mouseleave', () => {
-    if (!mgState || mgState.touchActive) return;
-    mgState.moveLeft = false;
-    mgState.moveRight = false;
+    if (e.key === '1' || e.key === 'a') handleResponse('agree');
+    if (e.key === '2' || e.key === 'r') handleResponse('refute');
+    if (e.key === '3' || e.key === 'd') handleResponse('deflect');
   });
 }
 

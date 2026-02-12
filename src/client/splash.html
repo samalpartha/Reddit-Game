@@ -1,67 +1,72 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Daily Verdict</title>
-    <link rel="stylesheet" href="splash.css" />
-    <script type="module" src="splash.ts"></script>
-  </head>
-  <body>
-    <div class="splash-app">
-      <!-- Header -->
-      <div class="splash-header">
-        <div class="splash-icon">⚖️</div>
-        <div class="splash-brand">
-          <h1 class="splash-title">Daily Verdict</h1>
-          <p class="splash-subtitle" id="splash-subtitle">Loading today's case...</p>
-        </div>
-      </div>
 
-      <!-- Case Preview -->
-      <div class="splash-case" id="splash-case">
-        <div class="splash-case-title" id="case-title"></div>
-        <div class="splash-case-preview" id="case-preview"></div>
-      </div>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Daily Verdict</title>
+  <link rel="stylesheet" href="splash.css" />
+  <script type="module" src="splash.ts"></script>
+</head>
 
-      <!-- Status Badge -->
-      <div class="splash-status" id="splash-status">
-        <span class="status-dot"></span>
-        <span class="status-text" id="status-text">Loading...</span>
-      </div>
-
-      <!-- Play Button -->
-      <button class="splash-play-btn" id="play-button">
-        <span id="play-text">Vote Now</span>
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path d="M6 3L11 8L6 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </button>
-
-      <!-- Mini-Game Button (shown after voting) -->
-      <button class="splash-minigame-btn hidden" id="minigame-button">
-        <span class="splash-mg-icon">🔨</span>
-        <span class="splash-mg-text">
-          <span class="splash-mg-title">Play Gavel Drop</span>
-          <span class="splash-mg-hint">Earn up to +10 bonus points while you wait!</span>
-        </span>
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path d="M6 3L11 8L6 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </button>
-
-      <!-- Stats Row -->
-      <div class="splash-stats" id="splash-stats">
-        <div class="stat">
-          <span class="stat-value" id="voter-count">-</span>
-          <span class="stat-label">Votes</span>
-        </div>
-        <div class="stat-divider"></div>
-        <div class="stat">
-          <span class="stat-value" id="time-left">-</span>
-          <span class="stat-label" id="time-label">Remaining</span>
-        </div>
+<body>
+  <div class="splash-app">
+    <!-- Header -->
+    <div class="splash-header">
+      <div class="splash-icon">⚖️</div>
+      <div class="splash-brand">
+        <h1 class="splash-title">Daily Verdict</h1>
+        <p class="splash-subtitle" id="splash-subtitle">Loading today's case...</p>
       </div>
     </div>
-  </body>
+
+    <!-- Case Preview -->
+    <div class="splash-case" id="splash-case">
+      <div class="splash-case-title" id="case-title"></div>
+      <div class="splash-case-preview" id="case-preview"></div>
+    </div>
+
+    <!-- Status Badge -->
+    <div class="splash-status" id="splash-status">
+      <span class="status-dot"></span>
+      <span class="status-text" id="status-text">Loading...</span>
+    </div>
+
+    <!-- Play Button -->
+    <button class="splash-play-btn" id="play-button">
+      <span id="play-text">Vote Now</span>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M6 3L11 8L6 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round" />
+      </svg>
+    </button>
+
+    <!-- Mini-Game Button (shown after voting) -->
+    <button class="splash-minigame-btn hidden" id="minigame-button">
+      <span class="splash-mg-icon">🔨</span>
+      <span class="splash-mg-text">
+        <span class="splash-mg-title">Play Verdict Courtroom</span>
+        <span class="splash-mg-hint">Earn up to +10 bonus points while you wait!</span>
+      </span>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M6 3L11 8L6 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round" />
+      </svg>
+    </button>
+
+    <!-- Stats Row -->
+    <div class="splash-stats" id="splash-stats">
+      <div class="stat">
+        <span class="stat-value" id="voter-count">-</span>
+        <span class="stat-label">Votes</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat">
+        <span class="stat-value" id="time-left">-</span>
+        <span class="stat-label" id="time-label">Remaining</span>
+      </div>
+    </div>
+  </div>
+</body>
+
 </html>

@@ -1,21 +1,25 @@
 # ⚖️ Daily Verdict
 
-> **A social prediction game for Reddit** — vote, predict, debate, and compete daily.
+> **A social prediction game for Reddit** — vote, predict, debate, and compete in rapid-fire rounds.
 
 Built on [Devvit Web](https://developers.reddit.com/docs/capabilities/devvit-web/devvit_web_overview) with [GameMaker](https://developers.reddit.com/docs/quickstart/quickstart-gamemaker) integration for [The Reddit Daily Games Hackathon](https://redditdailygames2026.devpost.com/). See the [GameMaker Quickstart](https://developers.reddit.com/docs/quickstart/quickstart-gamemaker) for setup details.
+
+## Live Demo
+
+Play the game live at: [r/red_dit_game_dev](https://www.reddit.com/r/red_dit_game_dev/)
 
 ---
 
 ## What Is Daily Verdict?
 
-Every **2 hours**, a new moral dilemma or social scenario appears as an interactive post in your subreddit. Players make **two blind choices** before seeing any results:
+Every **5 minutes**, a new moral dilemma or social scenario appears as an interactive post in your subreddit. Players make **two blind choices** before seeing any results:
 
 1. **Verdict** — What's the right call? *(4 options)*
 2. **Prediction** — What will the *majority* say? *(4 options)*
 
-Results stay **hidden** until the reveal window (30 min after voting closes). While waiting, play the **Gavel Drop** mini-game to earn bonus points! Players return for scoring, streaks, and leaderboard rankings. The comment thread becomes a battleground as players try to influence the vote for bonus points.
+Results stay **hidden** until the reveal window (1 minute after voting closes). While waiting, play the **Verdict Courtroom** mini-game to earn bonus points! Players return for scoring, streaks, and leaderboard rankings. The comment thread becomes a battleground as players try to influence the vote for bonus points.
 
-**It's not a poll. It's a social prediction game — with 12 rounds per day.**
+**It's not a poll. It's a social prediction game — with rapid-fire rounds all day long.**
 
 ---
 
@@ -23,10 +27,10 @@ Results stay **hidden** until the reveal window (30 min after voting closes). Wh
 
 | Feature | Description |
 |---------|-------------|
-| **2-Hour Cycles** | 12 rounds per day — 1.5h voting + 0.5h reveal delay = never boring |
+| **5-Minute Cycles** | Rapid gameplay loop — 4m voting + 1m reveal delay = constant action |
 | **Dual-Choice Mechanic** | Vote your opinion AND predict the crowd — creates a unique strategic layer |
 | **Delayed Reveal** | Results hidden until reveal time, driving return visits and anticipation |
-| **Gavel Drop Mini-Game** | Paratrooper-style catch game — earn up to +10 bonus points while waiting |
+| **Verdict Courtroom Mini-Game** | Defense attorney simulation — deflect counter-arguments to earn bonus points |
 | **Influence Bonus** | Commenting and persuading others earns extra points (+15 max) |
 | **Canvas Reveal Experience** | Spectacular HTML5 Canvas animated reveal with particles, physics stamps, and racing bars |
 | **Share Your Score** | Canvas-rendered score cards with clipboard copy and native share support |
@@ -42,22 +46,25 @@ Results stay **hidden** until the reveal window (30 min after voting closes). Wh
 ## Game States
 
 ### State 1: Open (Vote)
+
 - Case scenario with rich storytelling
 - Verdict picker (4 large thumb-friendly buttons with glow selection)
 - Prediction picker (4 buttons — predict the majority)
-- **Play Gavel Drop** mini-game button — accessible before voting too!
+- **Play Verdict Courtroom** mini-game button — accessible before voting too!
 - Countdown urgency: timer shifts **green → yellow → red** as deadline approaches
 - Branded scale loading animation
 - First-time onboarding overlay
 
 ### State 2: Voted (Waiting)
+
 - Your picks displayed with reveal countdown
 - CTA to comment (enables Influence Bonus tracking)
-- **Play Gavel Drop** mini-game button — earn bonus points while waiting!
-- Play Gavel Drop accessible directly from the **feed card** (splash view)
+- **Play Verdict Courtroom** mini-game button — earn bonus points while waiting!
+- Play Verdict Courtroom accessible directly from the **feed card** (splash view)
 - Archive access to past rounds
 
 ### State 3: Revealed (Results)
+
 - Animated verdict stamp with glow and bounce
 - Distribution bars with staggered race animation
 - Score breakdown with animated count-up
@@ -68,6 +75,7 @@ Results stay **hidden** until the reveal window (30 min after voting closes). Wh
 - GameMaker animated reveal button (expanded mode)
 
 ### State 4: Archive
+
 - Past cases with tap-through to full detail view
 - Complete results, bars, and score for each past case
 
@@ -82,37 +90,39 @@ Results stay **hidden** until the reveal window (30 min after voting closes). Wh
 | Timing Bonus | 0–20 | Earlier correct predictions score higher |
 | Influence Bonus | +15 | Your verdict's share rises 3%+ after your comment |
 | Streak Bonus | 0–10 | Consecutive rounds played |
-| Mini-Game Bonus | 0–10 | Play Gavel Drop: every 50 minigame points = +1 (max 10) |
+| Mini-Game Bonus | 0–10 | Verdict Courtroom: successfully defending your case earns points (max 10) |
 | **Max per round** | **145** | |
 
 ---
 
 ## Architecture
 
-```
-┌──────────────────────────────────────────────────────────┐
-│                    Reddit Post (Devvit)                   │
-│   ┌────────────┐  ┌──────────────┐  ┌─────────────────┐ │
-│   │  Splash    │  │    Game      │  │  Reveal         │ │
-│   │  (Inline)  │→ │  (Expanded)  │→ │  (Canvas/GM)    │ │
-│   └────────────┘  └──────┬───────┘  └─────────────────┘ │
-│                          │                                │
-│                          ▼                                │
-│   ┌─────────────────────────────────────────────────────┐│
-│   │              Hono Server (Devvit Web)                ││
-│   │  ┌────────┐  ┌───────────┐  ┌───────────────────┐  ││
-│   │  │ API    │  │ Scheduler │  │ Triggers / Menus  │  ││
-│   │  │ Routes │  │ Tasks     │  │ / Forms           │  ││
-│   │  └───┬────┘  └─────┬─────┘  └───────────────────┘  ││
-│   │      │              │                                ││
-│   │      ▼              ▼                                ││
-│   │  ┌─────────────────────────────────────────┐        ││
-│   │  │            Redis (Devvit KV)            │        ││
-│   │  │  Cases · Votes · Snapshots · Scores     │        ││
-│   │  │  Leaderboards · Streaks · Submissions   │        ││
-│   │  └─────────────────────────────────────────┘        ││
-│   └─────────────────────────────────────────────────────┘│
-└──────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    subgraph Client
+        Splash[Splash Feed Card] -->|Play/Vote| Game[Expanded Game View]
+        Game -->|Reveal Phase| Reveal[Canvas/GameMaker Reveal]
+        Game -->|Waiting Phase| MiniGame[Verdict Courtroom]
+    end
+
+    subgraph Server_Hono[Hono Server (Devvit Web)]
+        API[API Routes]
+        Scheduler[Cron Scheduler]
+        Triggers[App Triggers]
+    end
+
+    subgraph Data_Redis[Redis (Devvit KV)]
+        Cases
+        Votes
+        Scores
+        Leaderboards
+    end
+
+    Game -->|Fetch/Post| API
+    MiniGame -->|Submit Score| API
+    API -->|Read/Write| Data_Redis
+    Scheduler -->|Create/Close/Reveal| Data_Redis
+    Scheduler -->|Snapshot| Data_Redis
 ```
 
 ### Client Entrypoints
@@ -200,7 +210,7 @@ src/
 | GET | `/api/archive?days=7` | Get past revealed cases with scores |
 | POST | `/api/submit-case` | Submit a user case for mod review |
 | POST | `/api/comment-mark` | Record first comment time for influence tracking |
-| POST | `/api/minigame-score` | Submit Gavel Drop mini-game score for bonus |
+| POST | `/api/minigame-score` | Submit Verdict Courtroom mini-game score for bonus |
 | GET | `/api/leaderboard/weekly` | Get weekly leaderboard |
 | GET | `/api/mod/pending` | Get pending case submissions (mod only) |
 | POST | `/api/mod/approve` | Approve + schedule a submission (mod only) |
@@ -211,10 +221,10 @@ src/
 
 | Endpoint | Cron | Purpose |
 |----------|------|---------|
-| `daily-post` | `0 */2 * * *` | Create new round's case + Reddit post (every 2 hours) |
+| `daily-post` | `0 */2 * * *` | Create new round's case + Reddit post (every 5 mins) |
 | `snapshots` | `*/10 * * * *` | Snapshot vote distributions for influence tracking |
-| `close` | `*/5 * * * *` | Close expired voting windows |
-| `reveal` | `*/5 * * * *` | Reveal cases past reveal time, compute scores |
+| `close` | `*/1 * * * *` | Close expired voting windows |
+| `reveal` | `*/1 * * * *` | Reveal cases past reveal time, compute scores |
 
 ---
 
@@ -295,33 +305,29 @@ The reveal experience supports GameMaker WASM for a premium courtroom animation.
 
 ---
 
-## Gavel Drop Mini-Game
+## Verdict Courtroom Mini-Game
 
-A **paratrooper-style** bonus game themed around the verdict system. Available from the Voted view while waiting for results.
+A **defense attorney simulation** bonus game. Available from the Voted view while waiting for results.
 
 ### How to Play
 
-- **Verdict stamps and golden gavels** fall from the sky
-- Move your **catcher platform** left and right to catch items
-- **Controls**: Tap left half of screen to move left, right half to move right (or use arrow keys / A/D on desktop)
+- **Defend your verdict** against rapid-fire counter-arguments
+- **Controls**: Choose the best response strategy:
+  - **Refute**: Use facts to counter the argument
+  - **Agree**: Concede a minor point to build credibility
+  - **Deflect**: Pivot to a stronger talking point
+- **Time Pressure**: Respond before the timer runs out!
 
 ### Scoring
 
-| Item | Effect |
-|------|--------|
-| **Matching verdict** (your vote) | +10 points |
-| **Golden gavel** 🔨 | +25 points |
-| **Wrong verdict** | Lose 1 life |
-| **Red X hazard** | Lose 1 life |
-
-- You start with **3 lives** — game ends when all are lost
-- Difficulty increases over time (faster falling speed, shorter spawn intervals)
-- Your best score per round is saved — every 50 minigame points = +1 verdict bonus (max 10)
+- **Correct Response**: Earn points and maintain credibility
+- **Wrong Response**: Lose credibility (health)
+- **Bonus**: Every 50 minigame points = +1 verdict bonus (max 10)
 
 ### Architecture
 
 ```
-Voted View → "Play Gavel Drop" button → Canvas mini-game
+Voted View → "Play Verdict Courtroom" button → Canvas mini-game
   → POST /api/minigame-score → Redis (best per case+user)
   → Scoring service reads best → miniGameBonus in ScoreBreakdown
 ```
@@ -345,20 +351,10 @@ Voted View → "Play Gavel Drop" button → Canvas mini-game
 
 | Category | How We Qualify |
 |----------|----------------|
-| **Best Daily Game** | 12 rounds per day with unique cases, Gavel Drop mini-game, scoring, streaks, and leaderboards |
+| **Best Daily Game** | Rapid-fire 5-minute rounds, Verdict Courtroom mini-game, scoring, streaks, and leaderboards |
 | **Best Use of GameMaker** | GameMaker WASM bridge with courtroom reveal scene + Canvas fallback ([quickstart](https://developers.reddit.com/docs/quickstart/quickstart-gamemaker)) |
 | **Best Mobile Game Play** | One-column layout, thumb-size buttons, touch mini-game, sticky submit bar, safe area support |
 | **Best Use of User Contributions** | Case submission pipeline with mod approval, priority scheduling |
-
----
-
-## Screenshots
-
-> *Screenshots are captured from the live Reddit post experience.*
-
-| Open (Vote) | Revealed (Results) | Canvas Reveal | Archive |
-|:-----------:|:------------------:|:-------------:|:-------:|
-| Vote on today's case | See results + your score | Animated stamp reveal | Browse past cases |
 
 ---
 

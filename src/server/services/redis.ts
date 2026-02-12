@@ -272,7 +272,7 @@ export async function updateStreak(
     return streak; // Already counted this cycle
   }
 
-  const previousCycle = getPreviousCycleKey(dateKey);
+  const previousCycle = getPrevCycleKey(dateKey);
 
   if (streak.lastPlayedDate === previousCycle) {
     // Consecutive cycle
@@ -409,9 +409,9 @@ export async function getRecentCaseDates(subId: string, days: number): Promise<s
 }
 
 // ─── Date Utilities ──────────────────────────────────────────────────────────
-// Cycle keys use YYYYMMDDHH format where HH is the 2-hour slot (00, 02, ..., 22).
+// Cycle keys use YYYYMMDDHHMMSS format for minute-level granularity
 
-import { CYCLE_HOURS } from '../../shared/types';
+import { CYCLE_MINUTES } from '../../shared/types';
 
 export function getTodayDateKey(): string {
   const now = new Date();
@@ -422,9 +422,17 @@ export function formatCycleKey(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
-  const slot = Math.floor(d.getUTCHours() / CYCLE_HOURS) * CYCLE_HOURS;
-  const hh = String(slot).padStart(2, '0');
-  return `${y}${m}${day}${hh}`;
+
+  // Calculate which cycle slot we're in based on minutes since midnight
+  const totalMinutes = d.getUTCHours() * 60 + d.getUTCMinutes();
+  const slotIndex = Math.floor(totalMinutes / CYCLE_MINUTES);
+
+  // Convert slot back to hour and minute
+  const slotMinutes = slotIndex * CYCLE_MINUTES;
+  const hh = String(Math.floor(slotMinutes / 60)).padStart(2, '0');
+  const mm = String(slotMinutes % 60).padStart(2, '0');
+
+  return `${y}${m}${day}${hh}${mm}`;
 }
 
 /** Legacy format for backward compatibility */
@@ -443,14 +451,16 @@ export function getWeekKey(d: Date): string {
   return `${y}-W${String(week).padStart(2, '0')}`;
 }
 
-function getPreviousCycleKey(cycleKey: string): string {
-  // Parse YYYYMMDDHH, go back one cycle
+/** Legacy format for backward compatibility */
+export function getPrevCycleKey(cycleKey: string): string {
+  // Parse YYYYMMDDHHMM, go back one cycle
   const y = parseInt(cycleKey.slice(0, 4), 10);
   const m = parseInt(cycleKey.slice(4, 6), 10) - 1;
   const d = parseInt(cycleKey.slice(6, 8), 10);
   const h = parseInt(cycleKey.slice(8, 10), 10);
-  const date = new Date(y, m, d, h);
-  date.setHours(date.getHours() - CYCLE_HOURS);
+  const min = cycleKey.length >= 12 ? parseInt(cycleKey.slice(10, 12), 10) : 0;
+  const date = new Date(Date.UTC(y, m, d, h, min));
+  date.setUTCMinutes(date.getUTCMinutes() - CYCLE_MINUTES);
   return formatCycleKey(date);
 }
 
@@ -459,7 +469,8 @@ export function dateKeyToDate(dateKey: string): Date {
   const m = parseInt(dateKey.slice(4, 6), 10) - 1;
   const d = parseInt(dateKey.slice(6, 8), 10);
   const h = dateKey.length >= 10 ? parseInt(dateKey.slice(8, 10), 10) : 0;
-  return new Date(y, m, d, h);
+  const min = dateKey.length >= 12 ? parseInt(dateKey.slice(10, 12), 10) : 0;
+  return new Date(Date.UTC(y, m, d, h, min));
 }
 
 // ─── Minigame Score Operations ──────────────────────────────────────────────

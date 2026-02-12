@@ -203,9 +203,15 @@ export const DEFAULT_LABELS: [string, string, string, string] = [
   "Everyone's Wrong",
 ];
 
-export const CASE_OPEN_HOURS = 1.5; // 1.5 hours open for voting
-export const REVEAL_DELAY_HOURS = 0.5; // 0.5 hours after close for reveal (2h total cycle)
-export const CYCLE_HOURS = 2; // Total cycle length in hours
+// Voting cycle timing (in minutes for rapid gameplay)
+export const CASE_OPEN_MINUTES = 4; // 4 minutes open for voting
+export const REVEAL_DELAY_MINUTES = 1; // 1 minute after close for reveal
+export const CYCLE_MINUTES = 5; // Total cycle length: 5 minutes
+
+// Legacy hour-based constants for backward compatibility
+export const CASE_OPEN_HOURS = CASE_OPEN_MINUTES / 60; // ~0.025 hours
+export const REVEAL_DELAY_HOURS = REVEAL_DELAY_MINUTES / 60; // ~0.0083 hours
+export const CYCLE_HOURS = CYCLE_MINUTES / 60; // ~0.033 hours
 export const MAX_SUBMISSION_LENGTH = 600;
 export const MAX_SUBMISSIONS_PER_DAY = 3;
 export const INFLUENCE_THRESHOLD_PCT = 3; // 3 percentage point increase
