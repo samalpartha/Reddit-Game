@@ -8,6 +8,20 @@ Built on [Devvit Web](https://developers.reddit.com/docs/capabilities/devvit-web
 
 Play the game live at: [r/red_dit_game_dev](https://www.reddit.com/r/red_dit_game_dev/)
 
+## About the Project
+
+**Daily Verdict** transforms your subreddit into a daily courtroom where the community decides what's right and wrong.
+
+We built this project to answer a simple question: **Can we make a "daily habit" game that is inherently social?**
+
+Most daily games (Wordle, Connections) are solitary experiences you share *after* you finish. **Daily Verdict** is different. You play *with* the community. You have to predict what *they* will think. You have to debate *them* to win points. The game doesn't just happen on the screen—it happens in the comments.
+
+Key innovations:
+
+* **Social Prediction**: Takes the popular "AITA" format and turns it into a competitive prediction market.
+* **Rapid Cycles**: A new round every 5 minutes means there's always a reason to come back.
+* **Parliamentary Debate**: The "Verdict Courtroom" minigame gamifies the act of defending an opinion.
+
 ---
 
 ## What Is Daily Verdict?
@@ -47,37 +61,37 @@ Results stay **hidden** until the reveal window (1 minute after voting closes). 
 
 ### State 1: Open (Vote)
 
-- Case scenario with rich storytelling
-- Verdict picker (4 large thumb-friendly buttons with glow selection)
-- Prediction picker (4 buttons — predict the majority)
-- **Play Verdict Courtroom** mini-game button — accessible before voting too!
-- Countdown urgency: timer shifts **green → yellow → red** as deadline approaches
-- Branded scale loading animation
-- First-time onboarding overlay
+* Case scenario with rich storytelling
+* Verdict picker (4 large thumb-friendly buttons with glow selection)
+* Prediction picker (4 buttons — predict the majority)
+* **Play Verdict Courtroom** mini-game button — accessible before voting too!
+* Countdown urgency: timer shifts **green → yellow → red** as deadline approaches
+* Branded scale loading animation
+* First-time onboarding overlay
 
 ### State 2: Voted (Waiting)
 
-- Your picks displayed with reveal countdown
-- CTA to comment (enables Influence Bonus tracking)
-- **Play Verdict Courtroom** mini-game button — earn bonus points while waiting!
-- Play Verdict Courtroom accessible directly from the **feed card** (splash view)
-- Archive access to past rounds
+* Your picks displayed with reveal countdown
+* CTA to comment (enables Influence Bonus tracking)
+* **Play Verdict Courtroom** mini-game button — earn bonus points while waiting!
+* Play Verdict Courtroom accessible directly from the **feed card** (splash view)
+* Archive access to past rounds
 
 ### State 3: Revealed (Results)
 
-- Animated verdict stamp with glow and bounce
-- Distribution bars with staggered race animation
-- Score breakdown with animated count-up
-- **Share Your Score** button — generates a canvas card and copies to clipboard
-- Streak display with fire animations
-- Per-round & weekly leaderboard with medal colors
-- Mini-Game Bonus displayed in score breakdown
-- GameMaker animated reveal button (expanded mode)
+* Animated verdict stamp with glow and bounce
+* Distribution bars with staggered race animation
+* Score breakdown with animated count-up
+* **Share Your Score** button — generates a canvas card and copies to clipboard
+* Streak display with fire animations
+* Per-round & weekly leaderboard with medal colors
+* Mini-Game Bonus displayed in score breakdown
+* GameMaker animated reveal button (expanded mode)
 
 ### State 4: Archive
 
-- Past cases with tap-through to full detail view
-- Complete results, bars, and score for each past case
+* Past cases with tap-through to full detail view
+* Complete results, bars, and score for each past case
 
 ---
 
@@ -117,10 +131,7 @@ graph TD
         Scores
         Leaderboards
     end
-        Votes
-        Scores
-        Leaderboards
-    end
+
 
     Game -->|Fetch/Post| API
     MiniGame -->|Submit Score| API
@@ -236,9 +247,9 @@ src/
 
 ### Prerequisites
 
-- Node.js >= 22.2.0
-- [Devvit CLI](https://developers.reddit.com/docs/get-started/install) (`npm install -g devvit`)
-- A test subreddit with < 200 subscribers
+* Node.js >= 22.2.0
+* [Devvit CLI](https://developers.reddit.com/docs/get-started/install) (`npm install -g devvit`)
+* A test subreddit with < 200 subscribers
 
 ### Quick Start
 
@@ -282,6 +293,14 @@ npm run launch
 
 The reveal experience supports GameMaker WASM for a premium courtroom animation. The Canvas fallback provides a spectacular experience out of the box.
 
+### Why We Use GameMaker (Hybrid Architecture)
+
+We built a **GameMaker-first architecture** with a seamless HTML5 Canvas fallback. This allows us to:
+
+1. **Support High-Fidelity Scenes**: Use GameMaker for complex courtroom drama animations that would be difficult to code in raw Canvas.
+2. **Maintain Light Footprint**: If the user (or mod) doesn't upload the heavy WASM assets, the game automatically falls back to a lightweight, particle-rich Canvas version.
+3. **Preserve the Bridge**: The critical `gamemaker/bridge.ts` file is fully implemented, handling two-way communication between the Devvit app and the GameMaker runner.
+
 ### How It Works
 
 1. On reveal, the client checks for `runner.json`
@@ -299,13 +318,13 @@ The reveal experience supports GameMaker WASM for a premium courtroom animation.
 
 ### Canvas Reveal Features (Built-in Fallback)
 
-- Particle confetti explosion matching verdict color
-- Physics-based stamp drop with bounce and rotation
-- Screen shake on stamp impact
-- Bars race animation with gradient fills
-- Score counter with golden glow effect
-- Streak fire particle system
-- Interactive "Back to Game" button
+* Particle confetti explosion matching verdict color
+* Physics-based stamp drop with bounce and rotation
+* Screen shake on stamp impact
+* Bars race animation with gradient fills
+* Score counter with golden glow effect
+* Streak fire particle system
+* Interactive "Back to Game" button
 
 ---
 
@@ -315,18 +334,18 @@ A **defense attorney simulation** bonus game. Available from the Voted view whil
 
 ### How to Play
 
-- **Defend your verdict** against rapid-fire counter-arguments
-- **Controls**: Choose the best response strategy:
-  - **Refute**: Use facts to counter the argument
-  - **Agree**: Concede a minor point to build credibility
-  - **Deflect**: Pivot to a stronger talking point
-- **Time Pressure**: Respond before the timer runs out!
+* **Defend your verdict** against rapid-fire counter-arguments
+* **Controls**: Choose the best response strategy:
+  * **Refute**: Use facts to counter the argument
+  * **Agree**: Concede a minor point to build credibility
+  * **Deflect**: Pivot to a stronger talking point
+* **Time Pressure**: Respond before the timer runs out!
 
 ### Scoring
 
-- **Correct Response**: Earn points and maintain credibility
-- **Wrong Response**: Lose credibility (health)
-- **Bonus**: Every 50 minigame points = +1 verdict bonus (max 10)
+* **Correct Response**: Earn points and maintain credibility
+* **Wrong Response**: Lose credibility (health)
+* **Bonus**: Every 50 minigame points = +1 verdict bonus (max 10)
 
 ### Architecture
 
@@ -340,14 +359,14 @@ Voted View → "Play Verdict Courtroom" button → Canvas mini-game
 
 ## Content Safety & Devvit Rules Compliance
 
-- **No personal information**: Names, contact details, and locations rejected
-- **Content filtering**: No explicit, hateful, threatening, or harmful content
-- **Medical/legal safety**: No scenarios requiring professional advice
-- **Rate limiting**: 3 case submissions per user per day
-- **Mod approval**: All user-generated cases require moderator review
-- **Seed content**: 32 pre-approved cases ship with the app
-- **Validation**: Server-side input validation on all endpoints
-- **Authorization**: Mod-only endpoints protected with `requireMod()` checks
+* **No personal information**: Names, contact details, and locations rejected
+* **Content filtering**: No explicit, hateful, threatening, or harmful content
+* **Medical/legal safety**: No scenarios requiring professional advice
+* **Rate limiting**: 3 case submissions per user per day
+* **Mod approval**: All user-generated cases require moderator review
+* **Seed content**: 32 pre-approved cases ship with the app
+* **Validation**: Server-side input validation on all endpoints
+* **Authorization**: Mod-only endpoints protected with `requireMod()` checks
 
 ---
 
