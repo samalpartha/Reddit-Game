@@ -105,14 +105,18 @@ graph TD
         Game -->|Waiting Phase| MiniGame[Verdict Courtroom]
     end
 
-    subgraph Server_Hono[Hono Server (Devvit Web)]
+    subgraph Server ["Hono Server (Devvit Web)"]
         API[API Routes]
         Scheduler[Cron Scheduler]
         Triggers[App Triggers]
     end
 
-    subgraph Data_Redis[Redis (Devvit KV)]
+    subgraph Redis ["Redis (Devvit KV)"]
         Cases
+        Votes
+        Scores
+        Leaderboards
+    end
         Votes
         Scores
         Leaderboards
@@ -120,9 +124,9 @@ graph TD
 
     Game -->|Fetch/Post| API
     MiniGame -->|Submit Score| API
-    API -->|Read/Write| Data_Redis
-    Scheduler -->|Create/Close/Reveal| Data_Redis
-    Scheduler -->|Snapshot| Data_Redis
+    API -->|Read/Write| Redis
+    Scheduler -->|Create/Close/Reveal| Redis
+    Scheduler -->|Snapshot| Redis
 ```
 
 ### Client Entrypoints
