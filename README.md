@@ -26,12 +26,20 @@ Key innovations:
 
 ## What Is Daily Verdict?
 
+**Daily Verdict** is an interactive social prediction game built for Reddit.
+
+![Voting View](assets/screenshots/voting_view.png)
+
 Every **5 minutes**, a new moral dilemma or social scenario appears as an interactive post in your subreddit. Players make **two blind choices** before seeing any results:
 
 1. **Verdict** — What's the right call? *(4 options)*
 2. **Prediction** — What will the *majority* say? *(4 options)*
 
-Results stay **hidden** until the reveal window (1 minute after voting closes). While waiting, play the **Verdict Courtroom** mini-game to earn bonus points! Players return for scoring, streaks, and leaderboard rankings. The comment thread becomes a battleground as players try to influence the vote for bonus points.
+Results stay **hidden** until the reveal window (1 minute after voting closes). While waiting, play the **Verdict Courtroom** mini-game to earn bonus points!
+
+![Verdict Courtroom](assets/screenshots/minigame_start.png)
+
+Players return for scoring, streaks, and leaderboard rankings. The comment thread becomes a battleground as players try to influence the vote for bonus points.
 
 **It's not a poll. It's a social prediction game — with rapid-fire rounds all day long.**
 
