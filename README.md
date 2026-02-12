@@ -391,4 +391,6 @@ Voted View → "Play Verdict Courtroom" button → Canvas mini-game
 
 ## License
 
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
 Built for the Reddit Daily Games Hackathon 2026. See `devvit.json` for app configuration.

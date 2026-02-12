@@ -3,7 +3,7 @@
   "name": "red-dit-game",
   "version": "0.0.0",
   "description": "Daily Verdict - A social prediction game for Reddit",
-  "license": "BSD-3-Clause",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "build": "vite build",
